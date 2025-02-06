@@ -52,7 +52,7 @@ UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
         naiveproxy shadowsocks-rust sing-box v2ray-core v2ray-geodata v2ray-geoview v2ray-plugin \
         tuic-client chinadns-ng ipt2socks tcping trojan-plus simple-obfs shadowsocksr-libev \
         luci-app-passwall smartdns luci-app-smartdns v2dat mosdns luci-app-mosdns \
-        taskd luci-lib-xterm luci-lib-taskd \
+        taskd luci-lib-xterm luci-lib-taskd vlmcsd luci-app-vlmcsd\
         luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest \
         luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky luci-app-openclash mihomo \
         luci-app-mihomo luci-app-amlogic" "kenzok8/small-package" "main" "pkg"
@@ -135,7 +135,7 @@ provided_config_lines=(
     "CONFIG_PACKAGE_nano=y"
     "CONFIG_BUSYBOX_CONFIG_LSUSB=n"
     "CONFIG_PACKAGE_luci-app-netspeedtest=y"
-    "CONFIG_PACKAGE_luci-app-vlmcsd=y"
+    "CONFIG_PACKAGE_=y"
     "CONFIG_COREMARK_OPTIMIZE_O3=y"
     "CONFIG_COREMARK_ENABLE_MULTITHREADING=y"
     "CONFIG_COREMARK_NUMBER_OF_THREADS=6"
