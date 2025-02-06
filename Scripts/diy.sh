@@ -265,4 +265,5 @@ if [[ $WRT_SOURCE == "VIKINGYFY/immortalwrt" ]]; then
     fi
     if [ -f ./package/vlmcsd/Makefile ]; then
         sed -i 's/PKG_VERSION:=svn1113/PKG_VERSION:=1.1.13/' ./package/vlmcsd/Makefile
-    fifi
+    fi
+fi
