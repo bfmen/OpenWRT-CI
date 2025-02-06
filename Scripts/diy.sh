@@ -262,7 +262,9 @@ if [[ $WRT_SOURCE == "VIKINGYFY/immortalwrt" ]]; then
         sed -i 's/PKG_VERSION:=0\.1\.27-1/PKG_VERSION:=0\.1\.27/g' ./package/luci-app-store/Makefile
         sed -i 's/PKG_RELEASE:=$/PKG_RELEASE:=1/g' ./package/luci-app-store/Makefile
     fi
-    if [ -f ./package/vlmcsd/Makefile ]; then
-        sed -i 's/PKG_VERSION:=svn1113/PKG_VERSION:=1.1.13/' ./package/vlmcsd/Makefile
-    fi
+fi
+
+if [ -d "package/vlmcsd" ]; then
+	mkdir -p "package/vlmcsd/patches"
+        cp -f "${GITHUB_WORKSPACE}/Scripts/001-fix_compile_with_ccache.patch" "package/vlmcsd/patches"
 fi
