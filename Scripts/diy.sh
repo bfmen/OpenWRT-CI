@@ -244,27 +244,25 @@ find ./ -name "getifaddr.c" -exec sed -i 's/return 1;/return 0;/g' {} \;
 rm -rf ./feeds/packages/net/ddns-go;
 
 #fix makefile for apk
-if [[ $WRT_SOURCE == "VIKINGYFY/immortalwrt" ]]; then
-    if [ -f ./package/v2ray-geodata/Makefile ]; then
-        sed -i 's/VER)-\$(PKG_RELEASE)/VER)-r\$(PKG_RELEASE)/g' ./package/v2ray-geodata/Makefile
-    fi
-    if [ -f ./package/luci-lib-taskd/Makefile ]; then
-        sed -i 's/>=1\.0\.3-1/>=1\.0\.3-r1/g' ./package/luci-lib-taskd/Makefile
-    fi
-    if [ -f ./package/luci-app-openclash/Makefile ]; then
-        sed -i 's/PKG_RELEASE:=beta/PKG_RELEASE:=1/g' ./package/luci-app-openclash/Makefile
-    fi
-    if [ -f ./package/luci-app-quickstart/Makefile ]; then
-        sed -i 's/PKG_VERSION:=0\.8\.16-1/PKG_VERSION:=0\.8\.16/g' ./package/luci-app-quickstart/Makefile
-        sed -i 's/PKG_RELEASE:=$/PKG_RELEASE:=1/g' ./package/luci-app-quickstart/Makefile
-    fi
-    if [ -f ./package/luci-app-store/Makefile ]; then
-        sed -i 's/PKG_VERSION:=0\.1\.27-1/PKG_VERSION:=0\.1\.27/g' ./package/luci-app-store/Makefile
-        sed -i 's/PKG_RELEASE:=$/PKG_RELEASE:=1/g' ./package/luci-app-store/Makefile
-    fi
+if [ -f ./package/v2ray-geodata/Makefile ]; then
+    sed -i 's/VER)-\$(PKG_RELEASE)/VER)-r\$(PKG_RELEASE)/g' ./package/v2ray-geodata/Makefile
+fi
+if [ -f ./package/luci-lib-taskd/Makefile ]; then
+    sed -i 's/>=1\.0\.3-1/>=1\.0\.3-r1/g' ./package/luci-lib-taskd/Makefile
+fi
+if [ -f ./package/luci-app-openclash/Makefile ]; then
+    sed -i 's/PKG_RELEASE:=beta/PKG_RELEASE:=1/g' ./package/luci-app-openclash/Makefile
+fi
+if [ -f ./package/luci-app-quickstart/Makefile ]; then
+    sed -i 's/PKG_VERSION:=0\.8\.16-1/PKG_VERSION:=0\.8\.16/g' ./package/luci-app-quickstart/Makefile
+    sed -i 's/PKG_RELEASE:=$/PKG_RELEASE:=1/g' ./package/luci-app-quickstart/Makefile
+fi
+if [ -f ./package/luci-app-store/Makefile ]; then
+    sed -i 's/PKG_VERSION:=0\.1\.27-1/PKG_VERSION:=0\.1\.27/g' ./package/luci-app-store/Makefile
+    sed -i 's/PKG_RELEASE:=$/PKG_RELEASE:=1/g' ./package/luci-app-store/Makefile
 fi
 
 if [ -d "package/vlmcsd" ]; then
-	mkdir -p "package/vlmcsd/patches"
-        cp -f "${GITHUB_WORKSPACE}/Scripts/001-fix_compile_with_ccache.patch" "package/vlmcsd/patches"
+    mkdir -p "package/vlmcsd/patches"
+    cp -f "${GITHUB_WORKSPACE}/Scripts/001-fix_compile_with_ccache.patch" "package/vlmcsd/patches"
 fi
