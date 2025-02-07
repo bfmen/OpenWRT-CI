@@ -104,6 +104,7 @@ keywords_to_delete=(
     "nokia_ea0326gmp" "qihoo_360t7" "xiaomi_ax1800" "ruijie_rg-x60-pro" "tplink" "xiaomi_mi-router-ax3000t" "xiaomi_mi-router-wr30u" "xiaomi_redmi-router-ax6000"
     "abt_asr3000" "qihoo_360v6" "redmi_ax5" "redmi_ax5-jdcloud" "zn_m2" "cmcc_rm2-6""redmi_ax6-stock" "redmi_ax6" "xiaomi_ax3600-stock" "xiaomi_ax3600" "xiaomi_ax9000"
     "cetron_ct3003" "imou_lc-hx3001" "jcg_q30-pro" "cmcc_rm2-6" "aliyun_ap8220" "linksys_mr7350" "cudy_tr3000-v1" "uugamebooster" "luci-app-wol" "luci-i18n-wol-zh-cn" 
+    "CONFIG_TARGET_INITRAMFS" "ddns" "tailscale" "luci-app-advancedplus" "mihomo" "smartdns" "kucat" "bootstrap"
 )
 
 [[ $WRT_TARGET == *"WIFI-NO"* ]] && keywords_to_delete+=()
@@ -265,4 +266,4 @@ fi
 echo "sed -i '8c maxfail 1' /etc/ppp/options" >> package/base-files/files/lib/functions/uci-defaults.sh
 echo "sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh" >> package/base-files/files/lib/functions/uci-defaults.sh
 # 修复upnp问题
-echo "sed -i '10c option external_ip \"59.111.160.244\"' /etc/config/upnpd" >> package/base-files/files/lib/functions/uci-defaults.sh
+# echo "sed -i '10c option external_ip \"59.111.160.244\"' /etc/config/upnpd" >> package/base-files/files/lib/functions/uci-defaults.sh
