@@ -168,7 +168,7 @@ jobs:
           $GITHUB_WORKSPACE/Scripts/Settings.sh
           $GITHUB_WORKSPACE/Scripts/diy.sh          
 
-          make defconfig -j$(nproc) && make clean
+          make defconfig -j$(nproc) && make clean -j$(nproc)
 
       - name: Download Packages
         if: env.WRT_TEST != 'true'
