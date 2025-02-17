@@ -74,7 +74,7 @@ wget https://raw.githubusercontent.com/lisaac/luci-app-diskman/master/Parted.Mak
 
 
 #######################################
-#DIY
+#DIY Settings
 #######################################
 WRT_IP="192.168.1.1"
 WRT_NAME="FWRT"
