@@ -224,6 +224,7 @@ done
 
 #./scripts/feeds update -a
 #./scripts/feeds install -a
+make defconfig
 
 #find ./ -name "cascade.css" -exec sed -i 's/#5e72e4/#6fa49a/g; s/#483d8b/#6fa49a/g' {} \;
 #find ./ -name "dark.css" -exec sed -i 's/#5e72e4/#6fa49a/g; s/#483d8b/#6fa49a/g' {} \;
