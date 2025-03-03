@@ -143,7 +143,6 @@ provided_config_lines=(
     "CONFIG_PACKAGE_luci-app-frpc=m"
     "CONFIG_PACKAGE_luci-app-mosdns=y"
 )
-)
 
 [[ $WRT_TARGET == *"WIFI-NO"* ]] && provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n")
 if [[ $WRT_TAG == *"WIFI-NO"* ]]; then
