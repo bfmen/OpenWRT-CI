@@ -225,6 +225,8 @@ fi
     "CONFIG_PACKAGE_luci-app-tailscale=y"
     "CONFIG_PACKAGE_luci-app-msd_lite=y"
     "CONFIG_PACKAGE_luci-app-lucky=y"
+    "CONFIG_PACKAGE_luci-app-quickstart=y"
+    "CONFIG_PACKAGE_luci-app-store=y"
 )
 
 [[ $WRT_CONFIG == "IPQ"* ]] && provided_config_lines+=(
