@@ -171,7 +171,7 @@ if [[ "$WRT_CONFIG" != *"EMMC"* && "$WRT_CONFIG" == *"WIFI-NO"* ]]; then
 fi
 
 [[ $WRT_CONFIG == *"EMMC"* ]] && provided_config_lines+=(
-    "CONFIG_PACKAGE_luci-app-diskman=y"
+    #"CONFIG_PACKAGE_luci-app-diskman=y"
     "CONFIG_PACKAGE_luci-i18n-diskman-zh-cn=y"
     "CONFIG_PACKAGE_luci-app-docker=y"
     "CONFIG_PACKAGE_luci-i18n-docker-zh-cn=y"
