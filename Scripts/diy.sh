@@ -63,10 +63,10 @@ UPDATE_PACKAGE "speedtest-cli" "https://github.com/sbwml/openwrt_pkgs.git" "main
 
 
 
-#rm -rf $(find feeds/luci/ feeds/packages/ -maxdepth 3 -type d -iname luci-app-diskman -prune)
+rm -rf $(find feeds/luci/ feeds/packages/ -maxdepth 3 -type d -iname luci-app-diskman -prune)
 #rm -rf $(find feeds/luci/ feeds/packages/ -maxdepth 3 -type d -iname parted -prune)
-#mkdir -p luci-app-diskman && \
-#wget https://raw.githubusercontent.com/lisaac/luci-app-diskman/master/applications/luci-app-diskman/Makefile -O luci-app-diskman/Makefile
+mkdir -p luci-app-diskman && \
+wget https://raw.githubusercontent.com/lisaac/luci-app-diskman/master/applications/luci-app-diskman/Makefile -O luci-app-diskman/Makefile
 #mkdir -p parted && \
 #wget https://raw.githubusercontent.com/lisaac/luci-app-diskman/master/Parted.Makefile -O parted/Makefile
 
@@ -171,7 +171,7 @@ if [[ "$WRT_CONFIG" != *"EMMC"* && "$WRT_CONFIG" == *"WIFI-NO"* ]]; then
 fi
 
 [[ $WRT_CONFIG == *"EMMC"* ]] && provided_config_lines+=(
-    #"CONFIG_PACKAGE_luci-app-diskman=y"
+    "CONFIG_PACKAGE_luci-app-diskman=y"
     "CONFIG_PACKAGE_luci-i18n-diskman-zh-cn=y"
     "CONFIG_PACKAGE_luci-app-docker=y"
     "CONFIG_PACKAGE_luci-i18n-docker-zh-cn=y"
@@ -226,7 +226,7 @@ fi
     "CONFIG_PACKAGE_luci-app-msd_lite=y"
     "CONFIG_PACKAGE_luci-app-lucky=y"
     "CONFIG_PACKAGE_luci-app-quickstart=y"
-    #"CONFIG_PACKAGE_luci-app-store=y"
+    "CONFIG_PACKAGE_luci-app-store=y"
 )
 
 [[ $WRT_CONFIG == "IPQ"* ]] && provided_config_lines+=(
