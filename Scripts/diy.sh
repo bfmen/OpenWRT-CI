@@ -272,7 +272,7 @@ if [ -f ./package/luci-lib-taskd/Makefile ]; then
     sed -i 's/>=1\.0\.3-1/>=1\.0\.3-r1/g' ./package/luci-lib-taskd/Makefile
 fi
 if [ -f ./package/luci-app-openclash/Makefile ]; then
-    sed -i 's/PKG_RELEASE:=beta/PKG_RELEASE:=1/g' ./package/luci-app-openclash/Makefile
+    sed -i '/^PKG_VERSION:=/a PKG_RELEASE:=1' ./package/luci-app-openclash/Makefile
 fi
 if [ -f ./package/luci-app-quickstart/Makefile ]; then
     # 把 PKG_VERSION:=x.y.z-n 拆成 PKG_VERSION:=x.y.z 和 PKG_RELEASE:=n
