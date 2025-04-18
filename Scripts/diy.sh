@@ -226,7 +226,7 @@ fi
     "CONFIG_PACKAGE_luci-app-msd_lite=y"
     "CONFIG_PACKAGE_luci-app-lucky=y"
     "CONFIG_PACKAGE_luci-app-quickstart=y"
-    "CONFIG_PACKAGE_luci-app-store=y"
+    #"CONFIG_PACKAGE_luci-app-store=y"
 )
 
 [[ $WRT_CONFIG == "IPQ"* ]] && provided_config_lines+=(
@@ -263,6 +263,7 @@ find ./ -name "getifaddr.c" -exec sed -i 's/return 1;/return 0;/g' {} \;
 #find ./ -type d -name "ddns-go" -exec sh -c 'f="{}/Makefile"; [ -f "$f" ] && sed -i "/\$(INSTALL_BIN).*\/ddns-go.init.*\/etc\/init.d\/ddns-go/d" "$f"' \;
 rm -rf ./feeds/packages/net/ddns-go;
 
+
 #fix makefile for apk
 if [ -f ./package/v2ray-geodata/Makefile ]; then
     sed -i 's/VER)-\$(PKG_RELEASE)/VER)-r\$(PKG_RELEASE)/g' ./package/v2ray-geodata/Makefile
@@ -273,19 +274,15 @@ fi
 if [ -f ./package/luci-app-openclash/Makefile ]; then
     sed -i 's/PKG_RELEASE:=beta/PKG_RELEASE:=1/g' ./package/luci-app-openclash/Makefile
 fi
-#if [ -f ./package/luci-app-quickstart/Makefile ]; then
-#    sed -i 's/PKG_VERSION:=0\.8\.16-1/PKG_VERSION:=0\.8\.16/g' ./package/luci-app-quickstart/Makefile
-#    sed -i 's/PKG_RELEASE:=$/PKG_RELEASE:=1/g' ./package/luci-app-quickstart/Makefile
-#fi
 if [ -f ./package/luci-app-quickstart/Makefile ]; then
     # 把 PKG_VERSION:=x.y.z-n 拆成 PKG_VERSION:=x.y.z 和 PKG_RELEASE:=n
     sed -i -E 's/PKG_VERSION:=([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)/PKG_VERSION:=\1\nPKG_RELEASE:=\2/' ./package/luci-app-quickstart/Makefile
 fi
-
 if [ -f ./package/luci-app-store/Makefile ]; then
-    sed -i 's/PKG_VERSION:=0\.1\.27-1/PKG_VERSION:=0\.1\.27/g' ./package/luci-app-store/Makefile
-    sed -i 's/PKG_RELEASE:=$/PKG_RELEASE:=1/g' ./package/luci-app-store/Makefile
+    # 把 PKG_VERSION:=x.y.z-n 拆成 PKG_VERSION:=x.y.z 和 PKG_RELEASE:=n
+    sed -i -E 's/PKG_VERSION:=([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)/PKG_VERSION:=\1\nPKG_RELEASE:=\2/' ./package/luci-app-store/Makefile
 fi
+
 
 if [ -d "package/vlmcsd" ]; then
     mkdir -p "package/vlmcsd/patches"
