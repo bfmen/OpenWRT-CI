@@ -112,7 +112,7 @@ sudo -E apt-get -y install $(curl -fsSL https://raw.githubusercontent.com/ophub/
 
 keywords_to_delete=(
     "xiaomi_ax3600" "xiaomi_ax9000" "xiaomi_ax1800" "glinet" "jdcloud_ax6600" "kucat" "cmiot_ax18" "link_nn6000-v1" "link_nn6000-v2" "qihoo_360v6" 
-    "redmi_ax5" "redmi_ax5-jdcloud" "zn_m2" "aliyun_ap8220" "qnap_301w" "redmi_ax6" "mr7350" 
+    "redmi_ax5" "redmi_ax5-jdcloud" "zn_m2" "aliyun_ap8220" "qnap_301w" "redmi_ax6" "mr7350" "linksys_mr7500"
     "uugamebooster" "luci-app-wol" "luci-i18n-wol-zh-cn" "CONFIG_TARGET_INITRAMFS" "ddns" "luci-app-advancedplus" "mihomo" "nikki"
     "smartdns" "kucat" "bootstrap"
 )
@@ -178,10 +178,10 @@ fi
 [[ $WRT_CONFIG == *"EMMC"* ]] && provided_config_lines+=(
     "CONFIG_PACKAGE_luci-app-diskman=y"
     "CONFIG_PACKAGE_luci-i18n-diskman-zh-cn=y"
-    #"CONFIG_PACKAGE_luci-app-docker=y"
-    #"CONFIG_PACKAGE_luci-i18n-docker-zh-cn=y"
-    #"CONFIG_PACKAGE_luci-app-dockerman=y"
-    #"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y"
+    "CONFIG_PACKAGE_luci-app-docker=y"
+    "CONFIG_PACKAGE_luci-i18n-docker-zh-cn=y"
+    "CONFIG_PACKAGE_luci-app-dockerman=y"
+    "CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y"
     "CONFIG_PACKAGE_luci-app-alist=y"
     "CONFIG_PACKAGE_luci-i18n-alist-zh-cn=y"
     "CONFIG_PACKAGE_fdisk=y"
