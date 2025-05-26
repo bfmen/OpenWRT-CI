@@ -33,6 +33,7 @@ jobs:
     if: |
       (matrix.SOURCE == 'VIKINGYFY/immortalwrt' && matrix.BRANCH == 'main') ||
       (matrix.SOURCE == 'LiBwrt/openwrt-6.x' && matrix.BRANCH == 'k6.12-nss'）
+
     strategy:
       fail-fast: false
       #max-parallel: 3
