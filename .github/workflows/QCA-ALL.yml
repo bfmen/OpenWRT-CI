@@ -26,7 +26,7 @@ permissions: write-all
 jobs:
   config:
     name: ${{matrix.CONFIG}}
-    runs-on: ubuntu-latest
+    
     strategy:
       fail-fast: false
       # max-parallel: 3
@@ -39,26 +39,6 @@ jobs:
             BRANCH: main
           - SOURCE: LiBwrt/openwrt-6.x
             BRANCH: k6.12-nss]
-
-    steps:
-      - name: Debug Matrix Parameters
-        run: |
-          echo "Source: ${{ matrix.SOURCE }}"
-          echo "Branch: ${{ matrix.BRANCH }}"
-          echo "Config: ${{ matrix.CONFIG }}"
-          echo "Test Mode: ${{ inputs.TEST }}"
-          echo "Package: ${{ inputs.PACKAGE }}"
-          if [[ "${{ inputs.TEST }}" == "true" ]]; then
-            echo "Test mode enabled, skipping build."
-            exit 0
-          fi
-
-      - name: Validate Repository
-        run: |
-          if ! git ls-remote --exit-code https://github.com/${{ matrix.SOURCE }}.git ${{ matrix.BRANCH }}; then
-            echo "Error: Repository https://github.com/${{ matrix.SOURCE }}.git or branch ${{ matrix.BRANCH }} does not exist."
-            exit 1
-          fi
 
     # 调用公用编译核心WRT-CORE.yml
     uses: ./.github/workflows/WRT-CORE.yml
