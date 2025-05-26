@@ -30,7 +30,7 @@ jobs:
     name: ${{matrix.CONFIG}}
     strategy:
       fail-fast: false
-      #max-parallel: 3
+      max-parallel: 6
       matrix:
         CONFIG: [IPQ60XX-WIFI-YES, IPQ60XX-WIFI-NO,IPQ60XX-EMMC-WIFI-YES, IPQ60XX-EMMC-WIFI-NO, IPQ807X-WIFI-YES, IPQ807X-WIFI-NO]
         SOURCE: [VIKINGYFY/immortalwrt, LiBwrt/openwrt-6.x]
