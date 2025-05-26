@@ -90,7 +90,6 @@ jobs:
           echo "WRT_TARGET=$(grep -m 1 -oP '^CONFIG_TARGET_\K[\w]+(?=\=y)' ./Config/$WRT_CONFIG.txt | tr '[:lower:]' '[:upper:]')" >> $GITHUB_ENV
           echo "WRT_KVER=none" >> $GITHUB_ENV
           echo "WRT_LIST=none" >> $GITHUB_ENV
-          echo "WRT_VER=$(basename -s .git $WRT_REPO)-$WRT_BRANCH" >> $GITHUB_ENV
 
       - name: Clone Code
         run: |
