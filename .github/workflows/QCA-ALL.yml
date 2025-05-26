@@ -1,14 +1,12 @@
-#CI项目
+# CI项目
 name: QCA-ALL
 
-#CI计划
+# CI计划
 on:
-  #自动编译：当Auto-Clean运行完成后
   workflow_run:
     workflows: ["Auto-Clean"]
     types:
       - completed
-  #手动编译
   workflow_dispatch:
     inputs:
       PACKAGE:
@@ -21,50 +19,71 @@ on:
         required: false
         type: boolean
 
-#CI权限
+# CI权限
 permissions: write-all
 
-#CI任务
+# CI任务
 jobs:
   config:
     name: ${{matrix.CONFIG}}
-
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 3
+      # max-parallel: 3
       matrix:
+        CONFIG: [IPQ60XX-WIFI-YES, IPQ60XX-WIFI-NO, IPQ60XX-EMMC-WIFI-YES, IPQ60XX-EMMC-WIFI-NO, IPQ807X-WIFI-YES, IPQ807X-WIFI-NO]
+        SOURCE: [VIKINGYFY/immortalwrt, LiBwrt/openwrt-6.x]
+        BRANCH: [main, k6.12-nss]
         include:
-          - source: VIKINGYFY/immortalwrt
-            branch: main
-            config: [IPQ60XX-WIFI-YES, IPQ60XX-WIFI-NO, IPQ60XX-EMMC-WIFI-YES, IPQ60XX-EMMC-WIFI-NO, IPQ807X-WIFI-YES, IPQ807X-WIFI-NO]
-          - source: LiBwrt/openwrt-6.x
-            branch: k6.12-nss
-            config: [IPQ60XX-WIFI-YES, IPQ60XX-WIFI-NO, IPQ60XX-EMMC-WIFI-YES, IPQ60XX-EMMC-WIFI-NO, IPQ807X-WIFI-YES, IPQ807X-WIFI-NO]
+          - SOURCE: VIKINGYFY/immortalwrt
+            BRANCH: main
+          - SOURCE: LiBwrt/openwrt-6.x
+            BRANCH: k6.12-nss]
 
-    #调用公用编译核心WRT-CORE.yml
+    steps:
+      - name: Debug Matrix Parameters
+        run: |
+          echo "Source: ${{ matrix.SOURCE }}"
+          echo "Branch: ${{ matrix.BRANCH }}"
+          echo "Config: ${{ matrix.CONFIG }}"
+          echo "Test Mode: ${{ inputs.TEST }}"
+          echo "Package: ${{ inputs.PACKAGE }}"
+          if [[ "${{ inputs.TEST }}" == "true" ]]; then
+            echo "Test mode enabled, skipping build."
+            exit 0
+          fi
+
+      - name: Validate Repository
+        run: |
+          if ! git ls-remote --exit-code https://github.com/${{ matrix.SOURCE }}.git ${{ matrix.BRANCH }}; then
+            echo "Error: Repository https://github.com/${{ matrix.SOURCE }}.git or branch ${{ matrix.BRANCH }} does not exist."
+            exit 1
+          fi
+
+    # 调用公用编译核心WRT-CORE.yml
     uses: ./.github/workflows/WRT-CORE.yml
     with:
-      #编译配置
-      WRT_CONFIG: ${{matrix.config}}
-      #默认主题
+      # 编译配置
+      WRT_CONFIG: ${{ matrix.CONFIG }}
+      # 默认主题
       WRT_THEME: argon
-      #默认主机名
+      # 默认主机名
       WRT_NAME: OWRT
-      #默认WIFI名称
+      # 默认WIFI名称
       WRT_SSID: OWRT
-      #默认WIFI密码
+      # 默认WIFI密码
       WRT_WORD: 12345678
-      #默认地址
+      # 默认地址
       WRT_IP: 192.168.10.1
-      #默认密码，仅作提示，修改无用
+      # 默认密码，仅作提示，修改无用
       WRT_PW: 无
-      #源码链接
-      WRT_REPO: https://github.com/${{matrix.source}}.git
-      #源码分支
-      WRT_BRANCH: ${{matrix.branch}}
-      #源码名称
-      WRT_SOURCE: ${{matrix.source}}
-      #插件调整
-      WRT_PACKAGE: ${{inputs.PACKAGE}}
-      #仅输出配置文件
-      WRT_TEST: ${{inputs.TEST}}
+      # 源码链接
+      WRT_REPO: https://github.com/${{ matrix.SOURCE }}.git
+      # 源码分支
+      WRT_BRANCH: ${{ matrix.BRANCH }}
+      # 源码名称
+      WRT_SOURCE: ${{ matrix.SOURCE }}
+      # 插件调整
+      WRT_PACKAGE: ${{ inputs.PACKAGE }}
+      # 仅输出配置文件
+      WRT_TEST: ${{ inputs.TEST }}
