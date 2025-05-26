@@ -172,10 +172,10 @@ fi
 [[ $WRT_CONFIG == *"EMMC"* ]] && provided_config_lines+=(
     "CONFIG_PACKAGE_luci-app-diskman=y"
     "CONFIG_PACKAGE_luci-i18n-diskman-zh-cn=y"
-    #"CONFIG_PACKAGE_luci-app-docker=y"
-    #"CONFIG_PACKAGE_luci-i18n-docker-zh-cn=y"
-    #"CONFIG_PACKAGE_luci-app-dockerman=y"
-    #"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y"
+    "CONFIG_PACKAGE_luci-app-docker=m"
+    "CONFIG_PACKAGE_luci-i18n-docker-zh-cn=m"
+    "CONFIG_PACKAGE_luci-app-dockerman=m"
+    "CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m"
     "CONFIG_PACKAGE_luci-app-alist=y"
     "CONFIG_PACKAGE_luci-i18n-alist-zh-cn=y"
     "CONFIG_PACKAGE_fdisk=y"
@@ -220,11 +220,10 @@ fi
     "CONFIG_PACKAGE_kmod-dummy=y"
     "CONFIG_PACKAGE_kmod-veth=y"
     "CONFIG_PACKAGE_automount=y"
-    "CONFIG_PACKAGE_luci-app-frps=y" 
-    "CONFIG_PACKAGE_luci-app-tailscale=y"
-    #"CONFIG_PACKAGE_luci-app-lucky=y"
-    #"CONFIG_PACKAGE_luci-app-quickstart=y"
-    #"CONFIG_PACKAGE_luci-app-store=y"
+    "CONFIG_PACKAGE_luci-app-frps=y"
+    "CONFIG_PACKAGE_luci-app-ssr-plus=y"
+    "CONFIG_PACKAGE_luci-app-passwall2=y"
+    "CONFIG_PACKAGE_luci-app-samba4=y"
 )
 
 [[ $WRT_CONFIG == "IPQ"* ]] && provided_config_lines+=(
