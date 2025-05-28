@@ -274,9 +274,9 @@ sed -ri \'/check_signature/s@^[^#]@#&@\' /etc/opkg.conf\n" "package/emortal/defa
 
 #修复vlmcsd init
 #######
-#mkdir -p packages/vlmcsd/files/etc/init.d
-#install -Dm755 "${GITHUB_WORKSPACE}/Scripts/992_vlmcsd_init" "packages/vlmcsd/files/etc/init.d/vlmcsd"
-MAKEFILE="packages/vlmcsd/Makefile"
+#mkdir -p package/vlmcsd/files/etc/init.d
+#install -Dm755 "${GITHUB_WORKSPACE}/Scripts/992_vlmcsd_init" "package/vlmcsd/files/etc/init.d/vlmcsd"
+MAKEFILE="package/vlmcsd/Makefile"
 INIT_LINE1='\t$(INSTALL_DIR) $(1)/etc/init.d'
 INIT_LINE2='\t$(INSTALL_INIT_SCRIPT) ./files/vlmcsd.init $(1)/etc/init.d/vlmcsd'
 
