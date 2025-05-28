@@ -272,6 +272,43 @@ sed -i "/exit 0/i\\
 sed -ri \'/check_signature/s@^[^#]@#&@\' /etc/opkg.conf\n" "package/emortal/default-settings/files/99-default-settings"
 
 
+#修复vlmcsd init
+#######
+#mkdir -p package/feeds/packages/vlmcsd/files/etc/init.d
+#install -Dm755 "${GITHUB_WORKSPACE}/Scripts/992_vlmcsd_init" "package/feeds/packages/vlmcsd/files/etc/init.d/vlmcsd"
+MAKEFILE="package/feeds/packages/vlmcsd/Makefile"
+INIT_LINE1='\t$(INSTALL_DIR) $(1)/etc/init.d'
+INIT_LINE2='\t$(INSTALL_INIT_SCRIPT) ./files/vlmcsd.init $(1)/etc/init.d/vlmcsd'
+
+# 检查 Makefile 是否存在
+if [[ ! -f "$MAKEFILE" ]]; then
+    echo "❌ Makefile not found at $MAKEFILE"
+    exit 1
+fi
+
+# 检查是否已经包含 init 安装语句
+if grep -q "INSTALL_INIT_SCRIPT" "$MAKEFILE"; then
+    echo "✅ Makefile already contains init script install logic. Skipping."
+    exit 0
+fi
+
+# 插入 init 安装语句到 install 区块结尾前
+awk -v line1="$INIT_LINE1" -v line2="$INIT_LINE2" '
+    BEGIN { in_block=0 }
+    {
+        print
+        if ($0 ~ /^define Package\/vlmcsd\/install/) {
+            in_block = 1
+        } else if (in_block && /^endef/) {
+            print line1
+            print line2
+            in_block = 0
+        }
+    }
+' "$MAKEFILE" > "$MAKEFILE.tmp" && mv "$MAKEFILE.tmp" "$MAKEFILE"
+
+echo "✅ Makefile patched to include init script install logic."
+#########################
 
 
 
