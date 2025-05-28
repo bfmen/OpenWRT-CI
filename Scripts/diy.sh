@@ -271,47 +271,6 @@ sed -i "/exit 0/i\\
 sed -ri \'/check_signature/s@^[^#]@#&@\' /etc/opkg.conf\n" "package/emortal/default-settings/files/99-default-settings"
 
 
-#修复vlmcsd init
-#######
-MAKEFILE="package/vlmcsd/Makefile"
-INIT_LINE1='\t$(INSTALL_DIR) $(1)/etc/init.d'
-INIT_LINE2='\t$(INSTALL_INIT_SCRIPT) ./files/vlmcsd.init $(1)/etc/init.d/vlmcsd'
-
-# 检查 Makefile 是否存在
-if [[ ! -f "$MAKEFILE" ]]; then
-    echo "❌ Makefile not found at $MAKEFILE"
-    exit 1
-fi
-
-# 检查是否已含有 init 安装行
-if grep -q "INSTALL_INIT_SCRIPT" "$MAKEFILE"; then
-    echo "✅ Makefile already contains init script logic. Skipping."
-    exit 0
-fi
-
-# 正确插入到 install block 的 endef 之前
-awk -v line1="$INIT_LINE1" -v line2="$INIT_LINE2" '
-    BEGIN { in_block=0 }
-    {
-        if ($0 ~ /^define Package\/vlmcsd\/install/) {
-            in_block = 1
-        }
-
-        if (in_block && $0 ~ /^endef/) {
-            print line1
-            print line2
-            in_block = 0
-        }
-
-        print
-    }
-' "$MAKEFILE" > "$MAKEFILE.tmp" && mv "$MAKEFILE.tmp" "$MAKEFILE"
-
-echo "✅ Makefile successfully patched to include init script logic."
-
-#########################
-
-
 find ./ -name "getifaddr.c" -exec sed -i 's/return 1;/return 0;/g' {} \;
 
 #fix makefile for apk
@@ -337,7 +296,37 @@ fi
 if [ -d "package/vlmcsd" ]; then
     mkdir -p "package/vlmcsd/patches"
     cp -f "${GITHUB_WORKSPACE}/Scripts/001-fix_compile_with_ccache.patch" "package/vlmcsd/patches"
+
+    MAKEFILE="package/vlmcsd/Makefile"
+    chmod +x package/vlmcsd/files/vlmcsd.init
+    
+    # 如果 Makefile 存在且尚未包含 INSTALL_INIT_SCRIPT，则插入 init.d 安装逻辑
+    if [[ -f "$MAKEFILE" && ! $(grep -q "INSTALL_INIT_SCRIPT" "$MAKEFILE") ]]; then
+        echo "🛠 正在补丁 package/vlmcsd/Makefile 添加 init 脚本逻辑..."
+
+        awk '
+            BEGIN { in_block=0 }
+            {
+                if ($0 ~ /^define Package\/vlmcsd\/install/) {
+                    in_block = 1
+                }
+
+                if (in_block && $0 ~ /^endef/) {
+                    print "\t$(INSTALL_DIR) $(1)/etc/init.d"
+                    print "\t$(INSTALL_INIT_SCRIPT) ./files/vlmcsd.init $(1)/etc/init.d/vlmcsd"
+                    in_block = 0
+                }
+
+                print
+            }
+        ' "$MAKEFILE" > "$MAKEFILE.tmp" && mv "$MAKEFILE.tmp" "$MAKEFILE"
+	echo "$MAKEFILE"
+        echo "✅ Makefile 补丁完成: 添加 init 脚本安装逻辑。"
+    else
+        echo "ℹ️ Makefile 已存在或已有 init 脚本安装逻辑，跳过。"
+    fi
 fi
+
 
 
 #update golang
