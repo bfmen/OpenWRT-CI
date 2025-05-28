@@ -10,7 +10,7 @@ UPDATE_PACKAGE() {
 	# 清理旧的包
 	read -ra PKG_NAMES <<< "$PKG_NAME"  # 将PKG_NAME按空格分割成数组
 	for NAME in "${PKG_NAMES[@]}"; do
-		rm -rf $(find feeds/luci/ feeds/packages/ -maxdepth 3 -type d -iname "*$NAME*" -prune)
+		rm -rf $(find feeds/luci/ feeds/packages/ package/ -maxdepth 3 -type d -iname "*$NAME*" -prune)
 	done
 
 	# 克隆仓库
