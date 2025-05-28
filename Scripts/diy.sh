@@ -250,7 +250,6 @@ done
 
 #find ./ -name "cascade.css" -exec sed -i 's/#5e72e4/#6fa49a/g; s/#483d8b/#6fa49a/g' {} \;
 #find ./ -name "dark.css" -exec sed -i 's/#5e72e4/#6fa49a/g; s/#483d8b/#6fa49a/g' {} \;
-install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_set_argon_primary" "package/base-files/files/etc/uci-defaults/99_set_argon_primary"
 
 
 find ./ -name "cascade.css" -exec sed -i 's/#5e72e4/#31A1A1/g; s/#483d8b/#31A1A1/g' {} \;
@@ -274,8 +273,6 @@ sed -ri \'/check_signature/s@^[^#]@#&@\' /etc/opkg.conf\n" "package/emortal/defa
 
 #修复vlmcsd init
 #######
-#mkdir -p package/vlmcsd/files/etc/init.d
-#install -Dm755 "${GITHUB_WORKSPACE}/Scripts/992_vlmcsd_init" "package/vlmcsd/files/etc/init.d/vlmcsd"
 MAKEFILE="package/vlmcsd/Makefile"
 INIT_LINE1='\t$(INSTALL_DIR) $(1)/etc/init.d'
 INIT_LINE2='\t$(INSTALL_INIT_SCRIPT) ./files/vlmcsd.init $(1)/etc/init.d/vlmcsd'
