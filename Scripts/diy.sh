@@ -313,7 +313,7 @@ if [ -d "package/vlmcsd" ]; then
 
                 if (in_block && $0 ~ /^endef/) {
                     print "\t$(INSTALL_DIR) $(1)/etc/init.d"
-                    print "\t$(INSTALL_INIT_SCRIPT) ./files/vlmcsd.init $(1)/etc/init.d/vlmcsd"
+                    print "\t$(INSTALL_BIN) ./files/vlmcsd.init $(1)/etc/init.d/vlmcsd"
                     in_block = 0
                 }
 
