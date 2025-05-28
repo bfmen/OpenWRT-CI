@@ -298,6 +298,7 @@ if [ -d "package/vlmcsd" ]; then
     cp -f "${GITHUB_WORKSPACE}/Scripts/001-fix_compile_with_ccache.patch" "package/vlmcsd/patches"
 
     MAKEFILE="package/vlmcsd/Makefile"
+    cp -f "${GITHUB_WORKSPACE}/Scripts/992_vlmcsd_init" "package/vlmcsd/files"
     chmod +x package/vlmcsd/files/vlmcsd.init
     
     # 如果 Makefile 存在且尚未包含 INSTALL_INIT_SCRIPT，则插入 init.d 安装逻辑
@@ -327,9 +328,9 @@ if [ -d "package/vlmcsd" ]; then
     fi
 fi
 
-if [ -d "package/luci-app-vlmcsd" ]; then
-    find package/luci-app-vlmcsd -type f \( -name '*.js' -o -name '*.lua' -o -name '*.htm' \) -exec sed -i 's#/etc/vlmcsd.ini#/etc/vlmcsd/vlmcsd.ini#g' {} +
-fi
+#if [ -d "package/luci-app-vlmcsd" ]; then
+#    find package/luci-app-vlmcsd -type f \( -name '*.js' -o -name '*.lua' -o -name '*.htm' \) -exec sed -i 's#/etc/vlmcsd.ini#/etc/vlmcsd/vlmcsd.ini#g' {} +
+#fi
 
 
 #update golang
