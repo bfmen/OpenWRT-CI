@@ -307,6 +307,8 @@ awk -v line1="$INIT_LINE1" -v line2="$INIT_LINE2" '
     }
 ' "$MAKEFILE" > "$MAKEFILE.tmp" && mv "$MAKEFILE.tmp" "$MAKEFILE"
 
+cat "$MAKEFILE"
+
 echo "✅ Makefile patched to include init script install logic."
 #########################
 
