@@ -286,30 +286,31 @@ if [[ ! -f "$MAKEFILE" ]]; then
     exit 1
 fi
 
-# 检查是否已经包含 init 安装语句
+# 检查是否已含有 init 安装行
 if grep -q "INSTALL_INIT_SCRIPT" "$MAKEFILE"; then
-    echo "✅ Makefile already contains init script install logic. Skipping."
+    echo "✅ Makefile already contains init script logic. Skipping."
     exit 0
 fi
 
-# 插入 init 安装语句到 install 区块结尾前
+# 正确插入到 install block 的 endef 之前
 awk -v line1="$INIT_LINE1" -v line2="$INIT_LINE2" '
     BEGIN { in_block=0 }
     {
-        print
         if ($0 ~ /^define Package\/vlmcsd\/install/) {
             in_block = 1
-        } else if (in_block && /^endef/) {
+        }
+
+        if (in_block && $0 ~ /^endef/) {
             print line1
             print line2
             in_block = 0
         }
+
+        print
     }
 ' "$MAKEFILE" > "$MAKEFILE.tmp" && mv "$MAKEFILE.tmp" "$MAKEFILE"
 
-cat "$MAKEFILE"
-
-echo "✅ Makefile patched to include init script install logic."
+echo "✅ Makefile successfully patched to include init script logic.
 #########################
 
 
