@@ -227,7 +227,7 @@ fi
     "CONFIG_PACKAGE_kmod-nf-nat6=y"
     "CONFIG_PACKAGE_kmod-dummy=y"
     "CONFIG_PACKAGE_kmod-veth=y"
-    "CONFIG_PACKAGE_automount=y"
+    #"CONFIG_PACKAGE_automount=y"
     "CONFIG_PACKAGE_luci-app-frps=y"
     "CONFIG_PACKAGE_luci-app-ssr-plus=y"
     "CONFIG_PACKAGE_luci-app-passwall2=y"
