@@ -121,7 +121,7 @@ keywords_to_delete=(
     "smartdns" "kucat" "bootstrap"
 )
 
-[[ $WRT_CONFIG == *"WIFI-NO"* ]] && keywords_to_delete+=("usb" "wpad" "hostapd")
+[[ $WRT_CONFIG == *"WIFI-NO"* ]] && keywords_to_delete+=("wpad" "hostapd")
 [[ $WRT_CONFIG != *"EMMC"* ]] && keywords_to_delete+=("samba" "autosamba" "disk")
 [[ $WRT_CONFIG == *"EMMC"* ]] && keywords_to_delete+=("cmiot_ax18" "qihoo_v6" "qihoo_360v6" "redmi_ax5=y" "zn_m2")
 
