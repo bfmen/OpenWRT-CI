@@ -241,6 +241,7 @@ fi
     "CONFIG_PACKAGE_luci-app-samba4=y"
     "CONFIG_PACKAGE_luci-app-openclash=y"
     "CONFIG_PACKAGE_luci-app-quickfile=y"
+    "CONFIG_PACKAGE_quickfile=y"
 )
 
 [[ $WRT_CONFIG == "IPQ"* ]] && provided_config_lines+=(
