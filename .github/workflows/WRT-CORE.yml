@@ -147,7 +147,7 @@ jobs:
       - name: Cache Toolchain(缓存工具链)
         uses: HiGarfield/cachewrtbuild@main
         with:
-          ccache: false
+          ccache: true
           mixkey: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_HASH}}
           prefix: "wrt"
 
