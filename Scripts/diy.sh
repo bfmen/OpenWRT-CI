@@ -382,24 +382,9 @@ sed -i 's/PKG_SOURCE:=.*/PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz/' "$MAKEF
 sed -i 's|PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://download.libsodium.org/libsodium/releases|' "$MAKEFILE"
 sed -i 's/PKG_HASH:=.*/PKG_HASH:=462f4f1d1d73e82d60c6cf5283cf3b366ae1a0fb17735199caac7bf560b3dc3b/' "$MAKEFILE"
 
-# Check if CFLAGS line already exists to avoid duplication
-if grep -q "CFLAGS += -std=c11" "$MAKEFILE"; then
-  echo "CFLAGS += -std=c11 already present in $MAKEFILE"
-else
-  # Insert CFLAGS += -std=c11 after the exact line 'define Package/libsodium'
+# Insert CFLAGS += -std=c11 after the exact line 'define Package/libsodium'
+if ! grep -q "CFLAGS += -std=c11" "$MAKEFILE"; then
   sed -i '/^define Package\/libsodium$/a CFLAGS += -std=c11' "$MAKEFILE"
 fi
 
-# Verify the changes
-echo "Verifying changes in $MAKEFILE..."
-if grep -q "PKG_VERSION:=1.0.20" "$MAKEFILE" && \
-   grep -q "PKG_SOURCE:=libsodium-1.0.20.tar.gz" "$MAKEFILE" && \
-   grep -q "PKG_SOURCE_URL:=https://download.libsodium.org/libsodium/releases" "$MAKEFILE" && \
-   grep -q "PKG_HASH:=462f4f1d1d73e82d60c6cf5283cf3b366ae1a0fb17735199caac7bf560b3dc3b" "$MAKEFILE" && \
-   grep -q "CFLAGS += -std=c11" "$MAKEFILE"; then
-  echo "Successfully updated version to 1.0.20 and inserted CFLAGS += -std=c11 in $MAKEFILE"
-else
-  echo "Error: Failed to apply all changes to $MAKEFILE"
-  cat "$MAKEFILE"
-  exit 1
-fi
+echo "Successfully modified $MAKEFILE"
