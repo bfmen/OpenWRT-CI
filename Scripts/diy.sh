@@ -363,6 +363,7 @@ fi
 #sed -i 's/"admin\/services\/openlist"/"admin\/nas\/openlist"/' package/luci-app-openlist/luci-app-openlist/root/usr/share/luci/menu.d/luci-app-openlist.json
 
 #解决libsodium 编译问题
+
 # Define the target Makefile
 MAKEFILE="feeds/packages/libs/libsodium/Makefile"
 
@@ -371,6 +372,9 @@ if [ ! -f "$MAKEFILE" ]; then
   echo "Error: $MAKEFILE not found"
   exit 1
 fi
+
+# Remove any existing CFLAGS += -std=c11 to clean up previous errors
+sed -i '/CFLAGS += -std=c11/d' "$MAKEFILE"
 
 # Update version information
 sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=1.0.20/' "$MAKEFILE"
@@ -392,7 +396,7 @@ if grep -q "PKG_VERSION:=1.0.20" "$MAKEFILE" && \
    grep -q "PKG_SOURCE:=libsodium-1.0.20.tar.gz" "$MAKEFILE" && \
    grep -q "PKG_SOURCE_URL:=https://download.libsodium.org/libsodium/releases" "$MAKEFILE" && \
    grep -q "PKG_HASH:=462f4f1d1d73e82d60c6cf5283cf3b366ae1a0fb17735199caac7bf560b3dc3b" "$MAKEFILE" && \
-   grep -A 5 '^define Package\/libsodium$' "$MAKEFILE" | grep -q "CFLAGS += -std=c11"; then
+   grep -q "CFLAGS += -std=c11" "$MAKEFILE"; then
   echo "Successfully updated version to 1.0.20 and inserted CFLAGS += -std=c11 in $MAKEFILE"
 else
   echo "Error: Failed to apply all changes to $MAKEFILE"
