@@ -45,7 +45,7 @@ UPDATE_PACKAGE "openwrt-gecoosac" "lwb1978/openwrt-gecoosac" "main"
 #UPDATE_PACKAGE "luci-app-homeproxy" "immortalwrt/homeproxy" "master"
 UPDATE_PACKAGE "luci-app-ddns-go" "sirpdboy/luci-app-ddns-go" "main"
 #UPDATE_PACKAGE "luci-app-alist" "sbwml/luci-app-alist" "main"
-UPDATE_PACKAGE "luci-app-openlist" "sbwml/luci-app-openlist" "main"
+UPDATE_PACKAGE "luci-app-openlist2" "sbwml/luci-app-openlist2" "main"
 
 #small-package
 UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
@@ -191,8 +191,8 @@ fi
     #"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m"
     "CONFIG_PACKAGE_luci-app-podman=y"
     "CONFIG_PACKAGE_podman=y"
-    "CONFIG_PACKAGE_luci-app-openlist=y"
-    "CONFIG_PACKAGE_luci-i18n-openlist-zh-cn=y"
+    "CONFIG_PACKAGE_luci-app-openlist2=y"
+    "CONFIG_PACKAGE_luci-i18n-openlist2-zh-cn=y"
     #"CONFIG_PACKAGE_fdisk=y"
     #"CONFIG_PACKAGE_parted=y"
     "CONFIG_PACKAGE_iptables-mod-extra=y"
@@ -361,3 +361,41 @@ if [[ -d ./feeds/packages/lang/golang ]]; then
 fi
 
 #sed -i 's/"admin\/services\/openlist"/"admin\/nas\/openlist"/' package/luci-app-openlist/luci-app-openlist/root/usr/share/luci/menu.d/luci-app-openlist.json
+
+#解决libsodium 编译问题
+# Define the target Makefile
+MAKEFILE="./feeds/packages/libs/libsodium/Makefile"
+
+# Check if the Makefile exists
+if [ ! -f "$MAKEFILE" ]; then
+  echo "Error: $MAKEFILE not found"
+  exit 1
+fi
+
+# Update version information
+sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=1.0.20/' "$MAKEFILE"
+sed -i 's/PKG_SOURCE:=.*/PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz/' "$MAKEFILE"
+sed -i 's|PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://download.libsodium.org/libsodium/releases|' "$MAKEFILE"
+sed -i 's/PKG_HASH:=.*/PKG_HASH:=022a203b1fabb1a6dd2fa8d7b3a6e9d5e7b7799/' "$MAKEFILE"
+
+# Check if CFLAGS line already exists to avoid duplication
+if grep -q "CFLAGS += -std=c11" "$MAKEFILE"; then
+  echo "CFLAGS += -std=c11 already present in $MAKEFILE"
+else
+  # Insert CFLAGS += -std=c11 after define Package/libsodium
+  sed -i '/define Package\/libsodium/a CFLAGS += -std=c11' "$MAKEFILE"
+fi
+
+# Verify the changes
+echo "Verifying changes in $MAKEFILE..."
+if grep -q "PKG_VERSION:=1.0.20" "$MAKEFILE" && \
+   grep -q "PKG_SOURCE:=libsodium-1.0.20.tar.gz" "$MAKEFILE" && \
+   grep -q "PKG_SOURCE_URL:=https://download.libsodium.org/libsodium/releases" "$MAKEFILE" && \
+   grep -q "PKG_HASH:=022a203b1fabb1a6dd2fa8d7b3a6e9d5e7b7799" "$MAKEFILE" && \
+   grep -q "CFLAGS += -std=c11" "$MAKEFILE"; then
+  echo "Successfully updated version to 1.0.20 and inserted CFLAGS += -std=c11 in $MAKEFILE"
+else
+  echo "Error: Failed to apply all changes to $MAKEFILE"
+  cat "$MAKEFILE"
+  exit 1
+fi
