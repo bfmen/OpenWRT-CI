@@ -364,7 +364,7 @@ fi
 
 #解决libsodium 编译问题
 # Define the target Makefile
-MAKEFILE="./feeds/packages/libs/libsodium/Makefile"
+MAKEFILE="feeds/packages/libs/libsodium/Makefile"
 
 # Check if the Makefile exists
 if [ ! -f "$MAKEFILE" ]; then
@@ -376,14 +376,14 @@ fi
 sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=1.0.20/' "$MAKEFILE"
 sed -i 's/PKG_SOURCE:=.*/PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz/' "$MAKEFILE"
 sed -i 's|PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://download.libsodium.org/libsodium/releases|' "$MAKEFILE"
-sed -i 's/PKG_HASH:=.*/PKG_HASH:=022a203b1fabb1a6dd2fa8d7b3a6e9d5e7b7799/' "$MAKEFILE"
+sed -i 's/PKG_HASH:=.*/PKG_HASH:=462f4f1d1d73e82d60c6cf5283cf3b366ae1a0fb17735199caac7bf560b3dc3b/' "$MAKEFILE"
 
 # Check if CFLAGS line already exists to avoid duplication
 if grep -q "CFLAGS += -std=c11" "$MAKEFILE"; then
   echo "CFLAGS += -std=c11 already present in $MAKEFILE"
 else
-  # Insert CFLAGS += -std=c11 after define Package/libsodium
-  sed -i '/define Package\/libsodium/a CFLAGS += -std=c11' "$MAKEFILE"
+  # Insert CFLAGS += -std=c11 after the exact line 'define Package/libsodium'
+  sed -i '/^define Package\/libsodium$/a CFLAGS += -std=c11' "$MAKEFILE"
 fi
 
 # Verify the changes
@@ -391,8 +391,8 @@ echo "Verifying changes in $MAKEFILE..."
 if grep -q "PKG_VERSION:=1.0.20" "$MAKEFILE" && \
    grep -q "PKG_SOURCE:=libsodium-1.0.20.tar.gz" "$MAKEFILE" && \
    grep -q "PKG_SOURCE_URL:=https://download.libsodium.org/libsodium/releases" "$MAKEFILE" && \
-   grep -q "PKG_HASH:=022a203b1fabb1a6dd2fa8d7b3a6e9d5e7b7799" "$MAKEFILE" && \
-   grep -q "CFLAGS += -std=c11" "$MAKEFILE"; then
+   grep -q "PKG_HASH:=462f4f1d1d73e82d60c6cf5283cf3b366ae1a0fb17735199caac7bf560b3dc3b" "$MAKEFILE" && \
+   grep -A 5 '^define Package\/libsodium$' "$MAKEFILE" | grep -q "CFLAGS += -std=c11"; then
   echo "Successfully updated version to 1.0.20 and inserted CFLAGS += -std=c11 in $MAKEFILE"
 else
   echo "Error: Failed to apply all changes to $MAKEFILE"
