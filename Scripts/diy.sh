@@ -388,3 +388,7 @@ if ! grep -q "CFLAGS += -std=c11" "$MAKEFILE"; then
 fi
 
 echo "Successfully modified $MAKEFILE"
+
+./scripts/feeds update -a
+./scripts/feeds install -a
+
