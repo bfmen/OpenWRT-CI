@@ -403,7 +403,7 @@ echo "Successfully modified $MAKEFILE"
 
         # https://raw.githubusercontent.com/openwrt/packages/a4ad26b53f772c20b796715aef7ff458b5350781/libs/rpcsvc-proto/patches/0001-po-update-for-gettext-0.22.patch
         # 使用以上补丁修复rpcsvc-proto编译错误
-        local rpcsvc_proto_dir="./feeds/packages/libs/rpcsvc-proto"
+        rpcsvc_proto_dir="./feeds/packages/libs/rpcsvc-proto"
         if [ -d "$rpcsvc_proto_dir" ]; then
             patches_dir="$rpcsvc_proto_dir/patches"
             patch_name="0001-po-update-for-gettext-0.22.patch"
