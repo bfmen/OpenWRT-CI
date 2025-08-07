@@ -68,15 +68,6 @@ UPDATE_PACKAGE "openwrt-podman" "https://github.com/breeze303/openwrt-podman" "m
 UPDATE_PACKAGE "luci-app-quickfile" "https://github.com/sbwml/luci-app-quickfile" "main"
 sed -i 's|$(INSTALL_BIN) $(PKG_BUILD_DIR)/quickfile-$(ARCH_PACKAGES) $(1)/usr/bin/quickfile|$(INSTALL_BIN) $(PKG_BUILD_DIR)/quickfile-aarch64_generic $(1)/usr/bin/quickfile|' package/luci-app-quickfile/quickfile/Makefile
 
-rm -rf $(find feeds/luci/ feeds/packages/ -maxdepth 3 -type d -iname luci-app-diskman -prune)
-rm -rf $(find feeds/luci/ feeds/packages/ -maxdepth 3 -type d -iname parted -prune)
-mkdir -p package/luci-app-diskman && \
-wget https://raw.githubusercontent.com/lisaac/luci-app-diskman/master/applications/luci-app-diskman/Makefile -O package/luci-app-diskman/Makefile
-sed -i 's/fs-ntfs /fs-ntfs3 /g' package/luci-app-diskman/Makefile
-sed -i '/ntfs-3g-utils /d' package/luci-app-diskman/Makefile
-mkdir -p package/parted && \
-wget https://raw.githubusercontent.com/lisaac/luci-app-diskman/master/Parted.Makefile -O package/parted/Makefile
-
 UPDATE_PACKAGE "frp" "https://github.com/ysuolmai/openwrt-frp.git" "main"
 
 
@@ -184,8 +175,8 @@ if [[ "$WRT_CONFIG" != *"EMMC"* && "$WRT_CONFIG" == *"WIFI-NO"* ]]; then
 fi
 
 [[ $WRT_CONFIG == *"EMMC"* ]] && provided_config_lines+=(
-    #"CONFIG_PACKAGE_luci-app-diskman=y"
-    #"CONFIG_PACKAGE_luci-i18n-diskman-zh-cn=y"
+    "CONFIG_PACKAGE_luci-app-diskman=y"
+    "CONFIG_PACKAGE_luci-i18n-diskman-zh-cn=y"
     #"CONFIG_PACKAGE_luci-app-docker=m"
     #"CONFIG_PACKAGE_luci-i18n-docker-zh-cn=m"
     #"CONFIG_PACKAGE_luci-app-dockerman=m"
