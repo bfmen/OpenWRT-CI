@@ -159,7 +159,7 @@ provided_config_lines=(
     #"CONFIG_PACKAGE_luci-app-tailscale=y"
     #"CONFIG_PACKAGE_luci-app-msd_lite=y"
     #"CONFIG_PACKAGE_luci-app-lucky=y"
-    #"CONFIG_PACKAGE_luci-app-gecoosac=y"
+    "CONFIG_PACKAGE_luci-app-gecoosac=y"
 )
 
 #[[ $WRT_CONFIG == *"WIFI-NO"* ]] && provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n")
@@ -232,7 +232,7 @@ fi
     #"CONFIG_PACKAGE_luci-app-passwall2=y"
     "CONFIG_PACKAGE_luci-app-samba4=y"
     "CONFIG_PACKAGE_luci-app-openclash=y"
-    "CONFIG_PACKAGE_luci-app-quickfile=y"
+    #"CONFIG_PACKAGE_luci-app-quickfile=y"
     #"CONFIG_PACKAGE_quickfile=y"
 )
 
@@ -276,10 +276,10 @@ sed -ri \'/check_signature/s@^[^#]@#&@\' /etc/opkg.conf\n" "package/emortal/defa
 #解决 dropbear 配置的 bug
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_dropbear_setup.sh" "package/base-files/files/etc/uci-defaults/99_dropbear_setup"
 
-if [[ "$WRT_CONFIG" == *"EMMC"* ]]; then
+#if [[ "$WRT_CONFIG" == *"EMMC"* ]]; then
     #解决 nginx 的问题
-    install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_nginx_setup.sh" "package/base-files/files/etc/uci-defaults/99_nginx_setup"
-fi
+#    install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_nginx_setup.sh" "package/base-files/files/etc/uci-defaults/99_nginx_setup"
+#fi
 
 
 find ./ -name "getifaddr.c" -exec sed -i 's/return 1;/return 0;/g' {} \;
