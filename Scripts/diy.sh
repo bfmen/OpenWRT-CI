@@ -160,6 +160,9 @@ provided_config_lines=(
     #"CONFIG_PACKAGE_luci-app-msd_lite=y"
     #"CONFIG_PACKAGE_luci-app-lucky=y"
     "CONFIG_PACKAGE_luci-app-gecoosac=y"
+	"CONFIG_PACKAGE_luci-app-wireguard=y"
+    "CONFIG_PACKAGE_wireguard-tools=y"
+	"CONFIG_PACKAGE_kmod-wireguard=y"
 )
 
 #[[ $WRT_CONFIG == *"WIFI-NO"* ]] && provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n")
