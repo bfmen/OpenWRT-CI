@@ -70,6 +70,9 @@ sed -i 's|$(INSTALL_BIN) $(PKG_BUILD_DIR)/quickfile-$(ARCH_PACKAGES) $(1)/usr/bi
 
 #UPDATE_PACKAGE "frp" "https://github.com/ysuolmai/openwrt-frp.git" "main"
 
+# bandix
+UPDATE_PACKAGE "openwrt-bandix" "timsaya/openwrt-bandix" "main"
+UPDATE_PACKAGE "luci-app-bandix" "timsaya/luci-app-bandix" "main"
 
 
 #######################################
@@ -166,6 +169,8 @@ provided_config_lines=(
     "CONFIG_PACKAGE_luci-app-cifs-mount=y"
 	"CONFIG_PACKAGE_kmod-fs-cifs=y"
     "CONFIG_PACKAGE_cifsmount=y"
+	"CONFIG_PACKAGE_openwrt-bandix=y"
+    "CONFIG_PACKAGE_luci-app-bandix=y"
 )
 
 #[[ $WRT_CONFIG == *"WIFI-NO"* ]] && provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n")
