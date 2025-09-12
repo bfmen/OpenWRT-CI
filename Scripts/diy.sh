@@ -70,6 +70,9 @@ sed -i 's|$(INSTALL_BIN) $(PKG_BUILD_DIR)/quickfile-$(ARCH_PACKAGES) $(1)/usr/bi
 
 #UPDATE_PACKAGE "frp" "https://github.com/ysuolmai/openwrt-frp.git" "main"
 
+# bandix
+UPDATE_PACKAGE "openwrt-bandix" "timsaya/openwrt-bandix" "main"
+UPDATE_PACKAGE "luci-app-bandix" "timsaya/luci-app-bandix" "main"
 
 
 #######################################
