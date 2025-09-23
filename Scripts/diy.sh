@@ -113,12 +113,13 @@ sed -i "s/hostname='.*'/hostname='$WRT_NAME'/g" $CFG_FILE
 #sudo -E apt-get -y install $(curl -fsSL https://raw.githubusercontent.com/ophub/amlogic-s9xxx-armbian/main/compile-kernel/tools/script/ubuntu2204-make-openwrt-depends)
 
 keywords_to_delete=(
-    "xiaomi_ax3600" "xiaomi_ax9000" "xiaomi_ax1800" "glinet" "jdcloud_ax6600" "linksys" "link_nn6600" "kucat" "re-cs-02"
-    "mr7350" "uugamebooster" "luci-app-wol" "luci-i18n-wol-zh-cn" "CONFIG_TARGET_INITRAMFS" "ddns" "luci-app-advancedplus" "mihomo" "nikki"
+    "xiaomi_ax3600" "xiaomi_ax9000" "xiaomi_ax1800" "glinet" "jdcloud_ax6600" "kucat" "cmiot_ax18" "link_nn6000-v1" "link_nn6000-v2" "qihoo_360v6" 
+    "redmi_ax5" "redmi_ax5-jdcloud" "zn_m2" "aliyun_ap8220" "qnap_301w" "redmi_ax6" "mr7350" "linksys_mr7500"
+    "uugamebooster" "luci-app-wol" "luci-i18n-wol-zh-cn" "CONFIG_TARGET_INITRAMFS" "ddns" "luci-app-advancedplus" "mihomo" "nikki"
     "smartdns" "kucat" "bootstrap"
 )
 
-[[ $WRT_CONFIG == *"WIFI-NO"* ]] && keywords_to_delete+=("usb" "wpad" "hostapd")
+[[ $WRT_CONFIG == *"WIFI-NO"* ]] && keywords_to_delete+=("wpad" "hostapd")
 [[ $WRT_CONFIG != *"EMMC"* ]] && keywords_to_delete+=("samba" "autosamba" "disk")
 [[ $WRT_CONFIG == *"EMMC"* ]] && keywords_to_delete+=("cmiot_ax18" "qihoo_v6" "qihoo_360v6" "redmi_ax5=y" "zn_m2")
 
@@ -169,7 +170,13 @@ provided_config_lines=(
     "CONFIG_PACKAGE_luci-app-cifs-mount=y"
 	"CONFIG_PACKAGE_kmod-fs-cifs=y"
     "CONFIG_PACKAGE_cifsmount=y"
-)
+	"CONFIG_PACKAGE_luci-app-gecoosac=y"
+	"CONFIG_PACKAGE_kmod-wireguard=y"
+    "CONFIG_PACKAGE_wireguard-tools=y"
+	"CONFIG_PACKAGE_luci-proto-wireguard=y"
+    "CONFIG_PACKAGE_luci-app-cifs-mount=y"
+	"CONFIG_PACKAGE_kmod-fs-cifs=y"
+    "CONFIG_PACKAGE_cifsmount=y")
 
 #[[ $WRT_CONFIG == *"WIFI-NO"* ]] && provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n")
 if [[ $WRT_CONFIG == *"WIFI-NO"* ]]; then
@@ -188,8 +195,8 @@ fi
     #"CONFIG_PACKAGE_luci-i18n-diskman-zh-cn=y"
     "CONFIG_PACKAGE_luci-app-docker=m"
     "CONFIG_PACKAGE_luci-i18n-docker-zh-cn=m"
-    "CONFIG_PACKAGE_luci-app-dockerman=m"
-    "CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m"
+    "CONFIG_PACKAGE_luci-app-dockerman=y"
+    "CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y"
     #"CONFIG_PACKAGE_luci-app-podman=y"
     #"CONFIG_PACKAGE_podman=y"
     "CONFIG_PACKAGE_luci-app-openlist2=y"
@@ -363,3 +370,9 @@ if [ -f "$RUST_FILE" ]; then
 	
 	cd $PKG_PATH && echo "rust has been fixed!"
 fi
+
+# 修复拨号问题
+echo "sed -i '8c maxfail 1' /etc/ppp/options" >> package/base-files/files/lib/functions/uci-defaults.sh
+echo "sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh" >> package/base-files/files/lib/functions/uci-defaults.sh
+# 修复upnp问题
+echo "sed -i '10c option external_ip \"59.111.160.244\"' /etc/config/upnpd" >> package/base-files/files/lib/functions/uci-defaults.sh
