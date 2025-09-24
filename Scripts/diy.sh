@@ -176,7 +176,8 @@ provided_config_lines=(
 	"CONFIG_PACKAGE_luci-proto-wireguard=y"
     "CONFIG_PACKAGE_luci-app-cifs-mount=y"
 	"CONFIG_PACKAGE_kmod-fs-cifs=y"
-    "CONFIG_PACKAGE_cifsmount=y")
+    "CONFIG_PACKAGE_cifsmount=y"
+)
 
 #[[ $WRT_CONFIG == *"WIFI-NO"* ]] && provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n")
 if [[ $WRT_CONFIG == *"WIFI-NO"* ]]; then
