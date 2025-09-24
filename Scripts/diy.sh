@@ -373,7 +373,7 @@ if [ -f "$RUST_FILE" ]; then
 fi
 
 # 修复拨号问题
-echo "sed -i '8c maxfail 1' /etc/ppp/options" >> package/base-files/files/lib/functions/uci-defaults.sh
-echo "sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh" >> package/base-files/files/lib/functions/uci-defaults.sh
+echo "sed -i '8c maxfail 1' /etc/ppp/options" >> ./package/base-files/files/lib/functions/uci-defaults.sh
+echo "sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh" >> ./package/base-files/files/lib/functions/uci-defaults.sh
 # 修复upnp问题
-echo "sed -i '10c option external_ip \"59.111.160.244\"' /etc/config/upnpd" >> package/base-files/files/lib/functions/uci-defaults.sh
+echo "sed -i '10c option external_ip \"59.111.160.244\"' /etc/config/upnpd" >> ./package/base-files/files/lib/functions/uci-defaults.sh
