@@ -372,8 +372,21 @@ if [ -f "$RUST_FILE" ]; then
 	cd $PKG_PATH && echo "rust has been fixed!"
 fi
 
+#######################################
+# Fix PPP / UPnP issues
+#######################################
+mkdir -p package/base-files/files/etc/uci-defaults
+cat << 'EOF' > package/base-files/files/etc/uci-defaults/99-custom-fixes
+#!/bin/sh
 # 修复拨号问题
-echo "sed -i '8c maxfail 1' /etc/ppp/options" >> ./package/base-files/files/lib/functions/uci-defaults.sh
-echo "sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh" >> ./package/base-files/files/lib/functions/uci-defaults.sh
-# 修复upnp问题
-echo "sed -i '10c option external_ip \"59.111.160.244\"' /etc/config/upnpd" >> ./package/base-files/files/lib/functions/uci-defaults.sh
+sed -i '8c maxfail 1' /etc/ppp/options
+sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh
+
+# 修复 upnp 问题
+sed -i '10c option external_ip "59.111.160.244"' /etc/config/upnpd
+
+exit 0
+EOF
+chmod +x package/base-files/files/etc/uci-defaults/99-custom-fixes
+
+#######################################
