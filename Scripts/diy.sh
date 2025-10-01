@@ -172,6 +172,20 @@ provided_config_lines=(
     "CONFIG_PACKAGE_cifsmount=y"
 	"CONFIG_PACKAGE_git-http=y"
 	"CONFIG_PACKAGE_ca-bundle=y"
+	"CONFIG_PACKAGE_ca-bundle=y"
+    "CONFIG_PACKAGE_ca-certificates=y"
+    "CONFIG_PACKAGE_libopenssl=y"
+    "CONFIG_PACKAGE_openssl-util=y"
+    "CONFIG_PACKAGE_python3=y"
+    "CONFIG_PACKAGE_python3-pip=y"
+    "CONFIG_PACKAGE_python3-asyncio=y"
+    "CONFIG_PACKAGE_python3-requests=y"
+    "CONFIG_PACKAGE_python3-urllib=y"
+    "CONFIG_PACKAGE_python3-logging=y"
+    "CONFIG_PACKAGE_python3-openssl=y"
+    "CONFIG_PACKAGE_node=y"
+    "CONFIG_PACKAGE_node-npm=y"
+    "CONFIG_PACKAGE_wrangler=y"
 )
 
 #[[ $WRT_CONFIG == *"WIFI-NO"* ]] && provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n")
