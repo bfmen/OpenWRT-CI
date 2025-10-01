@@ -202,6 +202,7 @@ provided_config_lines=(
 	"CONFIG_PACKAGE_kmod-usb-net=y"
 	"CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y"
 	"CONFIG_PACKAGE_kmod-usb-net-rndis=y"
+	"CONFIG_PACKAGE_curl=y"
 )
 
 #[[ $WRT_CONFIG == *"WIFI-NO"* ]] && provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n")
