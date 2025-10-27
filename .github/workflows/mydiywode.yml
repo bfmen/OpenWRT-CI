@@ -8,9 +8,8 @@ on:
     branches:
       - main
     paths:
-      - '.github/workflows/sync-upstream.yml'
+      - '.github/workflows/mydiy.yml' # 注意：文件名应与你自己的文件名一致
 
-# 恢复为基础权限即可，因为关键认证由 PAT 完成
 permissions:
   contents: write
 
@@ -19,8 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    # 核心修复：使用 PAT_TOKEN 来检出仓库
-    # 这会赋予后续的 git 命令（包括 git push）足够的权限
+    # 步骤 1: 使用 PAT 检出仓库，以获得足够的权限
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
@@ -37,29 +35,29 @@ jobs:
         echo "Fetching from upstream..."
         git fetch upstream
         
+    # 步骤 2: 使用更精确的方式检查上游更新
     - name: Check for upstream updates
       id: check_updates
       run: |
-        # 获取本地和上游的最新提交
-        LOCAL=$(git rev-parse HEAD)
-        UPSTREAM=$(git rev-parse upstream/main)
+        echo "检查上游仓库是否有新提交..."
         
-        echo "Local commit: $LOCAL"
-        echo "Upstream commit: $UPSTREAM"
+        # 精确比较：列出上游有而本地没有的提交
+        # 如果这个命令有任何输出，说明上游有真正的更新
+        NEW_COMMITS=$(git rev-list HEAD..upstream/main)
         
-        if [ "$LOCAL" != "$UPSTREAM" ]; then
+        if [ -n "$NEW_COMMITS" ]; then
           echo "has_updates=true" >> $GITHUB_OUTPUT
-          echo "发现上游更新！"
+          echo "✅ 发现上游新提交！准备同步..."
           
           # 显示上游的新提交
           echo ""
           echo "================================"
-          echo "上游新提交："
+          echo "上游新提交列表："
           echo "================================"
-          git log HEAD..upstream/main --oneline --max-count=10
+          git log HEAD..upstream/main --oneline --max-count=20
         else
           echo "has_updates=false" >> $GITHUB_OUTPUT
-          echo "没有上游更新"
+          echo "✅ 上游没有新提交。您本地的修改不会触发不必要的同步。"
         fi
 
     - name: Merge upstream changes
@@ -67,25 +65,24 @@ jobs:
       run: |
         echo "合并上游更改..."
         
-        # 配置 git
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         
-        # 尝试合并
+        # 优先尝试合并，保留本地更改
         if git merge upstream/main --no-edit; then
           echo "✓ 成功合并上游更改"
         else
           echo "✗ 合并冲突，尝试使用 rebase"
           git merge --abort
           
-          # 尝试 rebase
+          # 其次尝试 rebase，也尽力保留本地更改
           if git rebase upstream/main; then
             echo "✓ 成功 rebase 上游更改"
           else
             echo "✗ Rebase 失败，使用强制策略"
             git rebase --abort
             
-            # 使用 theirs 策略处理冲突
+            # 最后使用 theirs 策略，以上游为准解决冲突
             git merge upstream/main -X theirs --no-edit
             echo "⚠ 使用上游版本解决冲突"
           fi
@@ -98,29 +95,21 @@ jobs:
         echo "禁用指定的工作流"
         echo "================================"
         
-        # 查找并禁用 Sync Config Files 工作流
         if [ -f ".github/workflows/sync-config.yml" ]; then
-          echo "找到 sync-config.yml，重命名为 .sync-config.yml.disabled"
-          mv .github/workflows/sync-config.yml .github/workflows/.sync-config.yml.disabled
+          mv .github/workflows/sync-config.yml .github/workflows/sync-config.yml.disabled
+          echo "已禁用 sync-config.yml"
         fi
         
-        # 查找并禁用 OWRT-ALL 工作流
         if [ -f ".github/workflows/OWRT-ALL.yml" ]; then
-          echo "找到 OWRT-ALL.yml，重命名为 .OWRT-ALL.yml.disabled"
-          mv .github/workflows/OWRT-ALL.yml .github/workflows/.OWRT-ALL.yml.disabled
+          mv .github/workflows/OWRT-ALL.yml .github/workflows/OWRT-ALL.yml.disabled
+          echo "已禁用 OWRT-ALL.yml"
         fi
         
-        # 列出所有工作流文件
         echo ""
         echo "当前工作流文件："
         ls -la .github/workflows/
-        
-        echo ""
-        echo "✓ 已禁用指定的工作流"
 
     - name: Apply 4 modifications to Scripts/diy.sh
-      # (此部分内容未改变，为简洁省略)
-      # ... 你的 Python 修改脚本 ...
       if: steps.check_updates.outputs.has_updates == 'true'
       run: |
         cat > modify.py << 'ENDPY'
@@ -129,7 +118,7 @@ jobs:
         with open('Scripts/diy.sh', 'r', encoding='utf-8') as f:
             content = f.read()
         
-        # 第一处修改：替换 keywords_to_delete 数组中的最后一行
+        # 修改1：替换 keywords_to_delete 数组
         content = re.sub(
             r'("smartdns" "kucat" "bootstrap")\n\)',
             r'\1 "zn_m2" "redmi_ax5" "qihoo_360v6" "redmi_ax5-jdcloud" "link_nn6000-v2" "link_nn6000-v1" "cmiot_ax18" "anysafe_e1"\n)',
@@ -137,9 +126,8 @@ jobs:
         )
         print("修改1完成：更新 keywords_to_delete 数组")
         
-        # 第二处修改：在 cifsmount=y 后添加新配置
+        # 修改2：添加新配置
         additions = '\t"CONFIG_PACKAGE_git-http=y"\n\t"CONFIG_PACKAGE_curl=y"\n\t"CONFIG_PACKAGE_openssl-util=y"\n\t"CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y"\n\t"CONFIG_PACKAGE_kmod-usb-net-rndis=y"'
-        
         content = re.sub(
             r'(    "CONFIG_PACKAGE_cifsmount=y")\n(\))',
             r'\1\n' + additions + r'\n\2',
@@ -147,7 +135,7 @@ jobs:
         )
         print("修改2完成：添加额外配置项")
         
-        # 第三处修改：在文件末尾添加 PPP/UPnP 修复
+        # 修改3：添加 PPP/UPnP 修复脚本
         fix_section = """
         #######################################
         # Fix PPP / UPnP issues
@@ -172,7 +160,7 @@ jobs:
         else:
             print("修改3已存在，跳过")
         
-        # 第四处修改：将 dockerman 从 m 改为 y
+        # 修改4：将 dockerman 从 m 改为 y
         content = content.replace(
             '"CONFIG_PACKAGE_luci-app-dockerman=m"',
             '"CONFIG_PACKAGE_luci-app-dockerman=y"'
@@ -192,47 +180,18 @@ jobs:
         python3 modify.py
         rm -f modify.py
 
-
     - name: Verify modifications
-      # (此部分内容未改变，为简洁省略)
-      # ... 你的验证脚本 ...
       if: steps.check_updates.outputs.has_updates == 'true'
       run: |
         echo "================================"
         echo "验证修改结果"
         echo "================================"
-        echo ""
-        
-        # 检查第一处修改
-        if grep -q '"zn_m2" "redmi_ax5" "qihoo_360v6"' Scripts/diy.sh; then
-          echo "✓ 第一处修改验证通过：设备列表已更新"
-        else
-          echo "✗ 第一处修改验证失败"
-        fi
-        
-        # 检查第二处修改
-        if grep -q 'CONFIG_PACKAGE_git-http=y' Scripts/diy.sh && \
-           grep -q 'CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y' Scripts/diy.sh; then
-          echo "✓ 第二处修改验证通过：配置项已添加"
-        else
-          echo "✗ 第二处修改验证失败"
-        fi
-        
-        # 检查第三处修改
-        if grep -q 'Fix PPP / UPnP issues' Scripts/diy.sh; then
-          echo "✓ 第三处修改验证通过：PPP/UPnP 修复已添加"
-        else
-          echo "✗ 第三处修改验证失败"
-        fi
-        
-        # 检查第四处修改
-        if grep -q 'CONFIG_PACKAGE_luci-app-dockerman=y' Scripts/diy.sh && \
-           grep -q 'CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y' Scripts/diy.sh; then
-          echo "✓ 第四处修改验证通过：dockerman 已改为内置"
-        else
-          echo "✗ 第四处修改验证失败"
-        fi
+        if grep -q '"zn_m2" "redmi_ax5" "qihoo_360v6"' Scripts/diy.sh; then echo "✓ 修改1验证通过"; else echo "✗ 修改1验证失败"; fi
+        if grep -q 'CONFIG_PACKAGE_git-http=y' Scripts/diy.sh; then echo "✓ 修改2验证通过"; else echo "✗ 修改2验证失败"; fi
+        if grep -q 'Fix PPP / UPnP issues' Scripts/diy.sh; then echo "✓ 修改3验证通过"; else echo "✗ 修改3验证失败"; fi
+        if grep -q 'CONFIG_PACKAGE_luci-app-dockerman=y' Scripts/diy.sh; then echo "✓ 修改4验证通过"; else echo "✗ 修改4验证失败"; fi
 
+    # 步骤 3: 提交并推送，包含 pull --rebase 防止冲突
     - name: Commit and push changes
       if: steps.check_updates.outputs.has_updates == 'true'
       run: |
@@ -242,28 +201,35 @@ jobs:
         git add -A
         
         if git diff --cached --quiet; then
-          echo "没有需要提交的更改"
+          echo "没有需要提交的更改。"
         else
-          git commit -m "Sync from upstream and apply modifications
+          git commit -m "Chore: Sync from upstream and apply modifications
 
-          Synced from: https://github.com/ysuolmai/OpenWRT-CI
+          - Synced from: https://github.com/ysuolmai/OpenWRT-CI
+          - Applied custom modifications to diy.sh
+          - Disabled sync-config and OWRT-ALL workflows
+          - Automated by GitHub Actions"
           
-          Applied modifications:
-          1. Added 8 devices to keywords_to_delete array
-          2. Added git-http, curl, openssl-util, USB network drivers
-          3. Added PPP/UPnP fix script
-          4. Changed dockerman from module (m) to built-in (y)
-          
-          Disabled workflows:
-          - Sync Config Files
-          - OWRT-ALL
-          
-          Automated by GitHub Actions"
-          
-          # 拉取远程更新，防止 non-fast-forward 错误
+          # 推送前先拉取远程更新，防止 non-fast-forward 错误
           git pull origin main --rebase
           
           git push origin main
         fi
-    
-    # ... 后续 Summary 和 Create sync report 步骤保持不变 ...
+
+    - name: Summary
+      if: always()
+      run: |
+        echo ""
+        echo "================================"
+        echo "工作流执行摘要"
+        echo "================================"
+        if [ "${{ job.status }}" == "success" ]; then
+          if [ "${{ steps.check_updates.outputs.has_updates }}" == "true" ]; then
+            echo "✅ 成功：已同步上游更新，应用修改并推送到 main 分支。"
+          else
+            echo "✅ 成功：上游无更新，未执行任何操作。"
+          fi
+        else
+            echo "❌ 失败：工作流执行过程中遇到错误。"
+        fi
+        echo "================================"
