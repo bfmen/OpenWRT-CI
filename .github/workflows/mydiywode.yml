@@ -50,7 +50,6 @@ jobs:
           else
             echo "has_updates=false" >> $GITHUB_OUTPUT
             echo "✅ 上游没有新提交。无需同步。"
-          fi
 
       - name: Merge upstream changes
         if: ${{ steps.check_updates.outputs.has_updates == 'true' }}
@@ -70,8 +69,6 @@ jobs:
               git rebase --abort || true
               git merge upstream/main -X theirs --no-edit
               echo "⚠ 使用上游版本解决冲突"
-            fi
-          fi
 
       - name: Disable OWRT-ALL workflow
         if: ${{ steps.check_updates.outputs.has_updates == 'true' }}
@@ -111,7 +108,6 @@ PY
             echo "⚠️ 已重命名以禁用 .github/workflows/OWRT-ALL.yml"
           else
             echo "⚠️ 未找到 .github/workflows/OWRT-ALL.yml 文件"
-          fi
 
       - name: Apply 4 modifications to Scripts/diy.sh
         if: ${{ steps.check_updates.outputs.has_updates == 'true' }}
@@ -164,7 +160,6 @@ ENDPY
           rm -f modify.py
 
       - name: Commit and push changes
-        # 修复点：确保 'if' 和 'run' 与 'name' 的缩进级别完全相同
         if: ${{ steps.check_updates.outputs.has_updates == 'true' }}
         run: |
           git config user.name "github-actions[bot]"
@@ -179,7 +174,6 @@ ENDPY
             echo "✅ 推送成功"
 
       - name: Summary
-        # 修复点：确保 'if' 和 'run' 与 'name' 的缩进级别完全相同
         if: always()
         run: |
           echo "================================"
