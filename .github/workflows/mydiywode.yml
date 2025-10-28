@@ -35,7 +35,7 @@ jobs:
 
       - name: Fetch upstream changes
         run: |
-          echo "正在从上游仓库拉取更新..."
+          echo "从上游仓库拉取最新提交..."
           git fetch upstream --prune
 
       - name: Check for upstream updates
@@ -44,11 +44,11 @@ jobs:
           NEW_COMMITS=$(git rev-list HEAD..upstream/main 2>/dev/null || echo "")
           if [ -n "$NEW_COMMITS" ]; then
             echo "has_updates=true" >> $GITHUB_OUTPUT
-            echo "::notice::检测到上游提交"
+            echo "::notice::发现上游新提交"
             git --no-pager log --oneline HEAD..upstream/main --max-count=30 || true
           else
             echo "has_updates=false" >> $GITHUB_OUTPUT
-            echo "::notice::未检测到上游更新"
+            echo "::notice::上游没有新提交"
           fi
 
       - name: Merge upstream changes
@@ -58,14 +58,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if git merge upstream/main --no-edit; then
-            echo "已通过 merge 合并上游更新"
+            echo "成功合并上游提交"
           else
             echo "合并冲突 — 尝试 rebase"
             git merge --abort || true
             if git rebase upstream/main; then
-              echo "已成功 rebase 上游更新"
+              echo "成功 rebase 上游提交"
             else
-              echo "Rebase 失败 — 使用上游作为最终来源"
+              echo "Rebase 失败 — 使用上游版本作为优先"
               git rebase --abort || true
               git merge upstream/main -X theirs --no-edit || true
             fi
@@ -78,7 +78,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          WF="OWRT-ALL.yml"
+          WF="OWRT-ALL"  # 去掉 .yml 后缀
           TOKEN="${PAT_TOKEN:-$GITHUB_TOKEN}"
           API_DISABLED=false
           if [ -n "$TOKEN" ]; then
@@ -87,25 +87,26 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               "https://api.github.com/repos/${REPO}/actions/workflows/${WF}/disable" || echo "000")
             if [ "$http_code" = "204" ]; then
-              echo "已通过 API 禁用工作流: $WF"
+              echo "✅ 成功通过 API 禁用工作流: $WF"
               API_DISABLED=true
             else
-              echo "API 禁用返回 HTTP $http_code，禁用 $WF 失败"
+              echo "⚠ API 禁用返回 HTTP $http_code，尝试 fallback"
             fi
           else
-            echo "未提供令牌，跳过 API 禁用"
+            echo "⚠ 无可用 token，跳过 API 禁用"
           fi
 
           if [ "$API_DISABLED" = "false" ]; then
-            path=".github/workflows/${WF}"
+            path=".github/workflows/${WF}.yml"
             if [ -f "$path" ]; then
               mv "$path" "${path}.disabled"
-              echo "已通过重命名禁用工作流: ${path} -> ${path}.disabled"
+              echo "✅ 通过重命名方式禁用工作流: ${path} -> ${path}.disabled"
             else
-              echo "未找到工作流文件: ${path}"
+              echo "⚠ 未找到工作流文件: ${path}"
             fi
           fi
 
+          echo "当前 workflows 文件列表："
           ls -la .github/workflows/ || true
 
       - name: Apply modifications to Scripts/diy.sh
@@ -114,7 +115,7 @@ jobs:
           set -euo pipefail
           TARGET="Scripts/diy.sh"
           if [ ! -f "$TARGET" ]; then
-            echo "未找到目标文件 $TARGET — 跳过修改"
+            echo "⚠ 目标文件 $TARGET 不存在 — 跳过修改"
             exit 0
           fi
 
@@ -149,7 +150,7 @@ jobs:
             } >> "$TARGET"
           fi
 
-          echo "预览修改内容 (tail 60):"
+          echo "预览修改文件尾部 (tail 60):"
           tail -n 60 "$TARGET" || true
 
       - name: Verify modifications
@@ -158,11 +159,11 @@ jobs:
           set -euo pipefail
           T="Scripts/diy.sh"
           OK=0
-          if grep -q '"zn_m2" "redmi_ax5" "qihoo_360v6"' "$T"; then echo "mod1 正确"; OK=$((OK+1)); else echo "mod1 失败"; fi
-          if grep -q 'CONFIG_PACKAGE_git-http=y' "$T"; then echo "mod2 正确"; OK=$((OK+1)); else echo "mod2 失败"; fi
-          if grep -q 'Fix PPP / UPnP issues' "$T"; then echo "mod3 正确"; OK=$((OK+1)); else echo "mod3 失败"; fi
-          if grep -q 'CONFIG_PACKAGE_luci-app-dockerman=y' "$T"; then echo "mod4 正确"; OK=$((OK+1)); else echo "mod4 失败"; fi
-          echo "通过 $OK/4"
+          if grep -q '"zn_m2" "redmi_ax5" "qihoo_360v6"' "$T"; then echo "修改1成功"; OK=$((OK+1)); else echo "修改1失败"; fi
+          if grep -q 'CONFIG_PACKAGE_git-http=y' "$T"; then echo "修改2成功"; OK=$((OK+1)); else echo "修改2失败"; fi
+          if grep -q 'Fix PPP / UPnP issues' "$T"; then echo "修改3成功"; OK=$((OK+1)); else echo "修改3失败"; fi
+          if grep -q 'CONFIG_PACKAGE_luci-app-dockerman=y' "$T"; then echo "修改4成功"; OK=$((OK+1)); else echo "修改4失败"; fi
+          echo "修改通过 $OK/4"
 
       - name: Commit and push changes
         if: steps.check_updates.outputs.has_updates == 'true'
@@ -174,7 +175,7 @@ jobs:
           git add -A
           if git diff --cached --quiet; then
             echo "pushed=false" >> $GITHUB_OUTPUT
-            echo "无修改需要提交"
+            echo "没有需要提交的更改"
           else
             git commit -m "chore: sync from upstream and apply modifications"
             if ! git pull origin main --rebase; then
@@ -188,15 +189,15 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          echo "===== 总结 ====="
+          echo "===== 执行摘要 ====="
           if [ "${{ steps.check_updates.outputs.has_updates }}" = "true" ]; then
             echo "已处理上游更新。"
             if [ "${{ steps.push_changes.outputs.pushed }}" = "true" ]; then
-              echo "修改已推送。"
+              echo "更改已推送到远程仓库。"
             else
-              echo "没有推送操作或无修改内容。"
+              echo "无推送操作或无需推送。"
             fi
           else
-            echo "未检测到上游更新。"
+            echo "上游无更新。"
           fi
-          echo "已禁用目标工作流: OWRT-ALL.yml (优先 API，失败则重命名)。"
+          echo "已禁用目标工作流: OWRT-ALL (优先 API，失败则重命名)."
