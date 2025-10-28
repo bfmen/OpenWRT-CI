@@ -1,9 +1,9 @@
 name: Sync Upstream and Apply Modifications
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
   schedule:
-    - cron: '0 2 * * *'  # 每天凌晨2点（UTC时间）自动执行
+    - cron: '0 2 * * *'  # 每天 UTC 02:00
   push:
     branches:
       - main
@@ -58,17 +58,19 @@ jobs:
           echo "合并上游更改..."
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
           if git merge upstream/main --no-edit; then
             echo "✓ 成功合并上游更改"
           else
             echo "✗ 合并冲突，尝试使用 rebase"
             git merge --abort || true
+
             if git rebase upstream/main; then
               echo "✓ 成功 rebase 上游更改"
             else
-              echo "✗ Rebase 失败，使用强制策略"
+              echo "✗ Rebase 失败，使用上游优先合并策略"
               git rebase --abort || true
-              git merge upstream/main -X theirs --no-edit
+              git merge upstream/main -X theirs --no-edit || true
               echo "⚠ 使用上游版本解决冲突"
             fi
           fi
@@ -79,30 +81,29 @@ jobs:
           echo "================================"
           echo "禁用指定的工作流"
           echo "================================"
-          workflows_to_disable=(
-            "sync-config.yml"
-            "OWRT-ALL.yml"
-          )
+          workflows_to_disable=("sync-config.yml" "OWRT-ALL.yml")
           disabled_count=0
+
           for workflow in "${workflows_to_disable[@]}"; do
             workflow_path=".github/workflows/$workflow"
             if [ -f "$workflow_path" ]; then
               mv "$workflow_path" "${workflow_path}.disabled"
               echo "✓ 已禁用 $workflow"
-              ((disabled_count++))
+              disabled_count=$((disabled_count+1))
             else
               echo "⚠ 未找到 $workflow"
             fi
           done
+
           echo ""
           echo "已禁用 $disabled_count 个工作流"
-          echo ""
           echo "当前工作流文件："
-          ls -la .github/workflows/ | grep -E '\.yml|\.yaml' || true
+          ls -la .github/workflows/ | grep -E '\.ya?ml' || true
 
       - name: Apply 4 modifications to Scripts/diy.sh
         if: steps.check_updates.outputs.has_updates == 'true'
         run: |
+          # 生成并执行临时 Python 修改脚本（heredoc 标识符在列首）
           cat > modify.py <<'ENDPY'
 import re
 import sys
@@ -117,24 +118,22 @@ except FileNotFoundError:
 # 修改1：替换 keywords_to_delete 数组
 old_pattern = r'("smartdns" "kucat" "bootstrap")\n\)'
 new_replacement = r'\1 "zn_m2" "redmi_ax5" "qihoo_360v6" "redmi_ax5-jdcloud" "link_nn6000-v2" "link_nn6000-v1" "cmiot_ax18" "anysafe_e1"\n)'
-
 if re.search(old_pattern, content):
     content = re.sub(old_pattern, new_replacement, content)
     print("✓ 修改1完成：更新 keywords_to_delete 数组")
 else:
     print("⚠ 修改1跳过：未找到目标文本或已修改")
 
-# 修改2：添加新配置
+# 修改2：添加新配置项（基于找到特定行）
 additions = '\t"CONFIG_PACKAGE_git-http=y"\n\t"CONFIG_PACKAGE_curl=y"\n\t"CONFIG_PACKAGE_openssl-util=y"\n\t"CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y"\n\t"CONFIG_PACKAGE_kmod-usb-net-rndis=y"'
 config_pattern = r'(    "CONFIG_PACKAGE_cifsmount=y")\n(\))'
-
 if re.search(config_pattern, content) and 'CONFIG_PACKAGE_git-http=y' not in content:
     content = re.sub(config_pattern, r'\1\n' + additions + r'\n\2', content)
     print("✓ 修改2完成：添加额外配置项")
 else:
     print("⚠ 修改2跳过：未找到目标或已存在")
 
-# 修改3：添加 PPP/UPnP 修复脚本
+# 修改3：添加 PPP/UPnP 修复脚本（作为字符串追加）
 if "Fix PPP / UPnP issues" not in content:
     fix_section = """
 #######################################
@@ -161,17 +160,10 @@ else:
 # 修改4：将 dockerman 从 m 改为 y
 changes_made = 0
 if '"CONFIG_PACKAGE_luci-app-dockerman=m"' in content:
-    content = content.replace(
-        '"CONFIG_PACKAGE_luci-app-dockerman=m"',
-        '"CONFIG_PACKAGE_luci-app-dockerman=y"'
-    )
+    content = content.replace('"CONFIG_PACKAGE_luci-app-dockerman=m"', '"CONFIG_PACKAGE_luci-app-dockerman=y"')
     changes_made += 1
-
 if '"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m"' in content:
-    content = content.replace(
-        '"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m"',
-        '"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y"'
-    )
+    content = content.replace('"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m"', '"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y"')
     changes_made += 1
 
 if changes_made > 0:
@@ -179,11 +171,11 @@ if changes_made > 0:
 else:
     print("⚠ 修改4跳过：未找到或已修改")
 
-# 写入文件
+# 写回文件
 with open('Scripts/diy.sh', 'w', encoding='utf-8') as f:
     f.write(content)
 
-print("\n✅ 所有修改处理完成！")
+print("✅ 所有修改处理完成！")
 ENDPY
 
           python3 modify.py
@@ -197,30 +189,31 @@ ENDPY
           echo "================================"
           verify_count=0
           total_count=4
+
           if grep -q '"zn_m2" "redmi_ax5" "qihoo_360v6"' Scripts/diy.sh; then
             echo "✓ 修改1验证通过"
-            ((verify_count++))
+            verify_count=$((verify_count+1))
           else
             echo "✗ 修改1验证失败"
           fi
 
           if grep -q 'CONFIG_PACKAGE_git-http=y' Scripts/diy.sh; then
             echo "✓ 修改2验证通过"
-            ((verify_count++))
+            verify_count=$((verify_count+1))
           else
             echo "✗ 修改2验证失败"
           fi
 
           if grep -q 'Fix PPP / UPnP issues' Scripts/diy.sh; then
             echo "✓ 修改3验证通过"
-            ((verify_count++))
+            verify_count=$((verify_count+1))
           else
             echo "✗ 修改3验证失败"
           fi
 
           if grep -q 'CONFIG_PACKAGE_luci-app-dockerman=y' Scripts/diy.sh; then
             echo "✓ 修改4验证通过"
-            ((verify_count++))
+            verify_count=$((verify_count+1))
           else
             echo "✗ 修改4验证失败"
           fi
@@ -238,22 +231,17 @@ ENDPY
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
+
           if git diff --cached --quiet; then
-            echo "ℹ️ 没有需要提交的更改"
             echo "pushed=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ 没有需要提交的更改"
           else
-            git commit -m "chore: sync from upstream and apply modifications
-
-- Synced from: https://github.com/ysuolmai/OpenWRT-CI
-- Applied 4 custom modifications to Scripts/diy.sh
-- Disabled workflows: sync-config.yml, OWRT-ALL.yml
-
-Automated by GitHub Actions"
+            git commit -m "chore: sync from upstream and apply modifications"
             if ! git pull origin main --rebase; then
               git rebase --abort || true
-              git pull origin main --no-rebase
+              git pull origin main --no-rebase || true
             fi
-            git push origin main
+            git push origin main || true
             echo "pushed=true" >> $GITHUB_OUTPUT
           fi
 
