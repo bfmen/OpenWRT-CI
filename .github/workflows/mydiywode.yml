@@ -35,7 +35,7 @@ jobs:
 
       - name: Fetch upstream changes
         run: |
-          echo "Fetching from upstream..."
+          echo "正在从上游仓库拉取更新..."
           git fetch upstream --prune
 
       - name: Check for upstream updates
@@ -44,11 +44,11 @@ jobs:
           NEW_COMMITS=$(git rev-list HEAD..upstream/main 2>/dev/null || echo "")
           if [ -n "$NEW_COMMITS" ]; then
             echo "has_updates=true" >> $GITHUB_OUTPUT
-            echo "::notice::Found upstream commits"
+            echo "::notice::检测到上游提交"
             git --no-pager log --oneline HEAD..upstream/main --max-count=30 || true
           else
             echo "has_updates=false" >> $GITHUB_OUTPUT
-            echo "::notice::No upstream commits"
+            echo "::notice::未检测到上游更新"
           fi
 
       - name: Merge upstream changes
@@ -58,14 +58,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if git merge upstream/main --no-edit; then
-            echo "Merged upstream via merge"
+            echo "已通过 merge 合并上游更新"
           else
-            echo "Merge conflict — trying rebase"
+            echo "合并冲突 — 尝试 rebase"
             git merge --abort || true
             if git rebase upstream/main; then
-              echo "Rebased upstream"
+              echo "已成功 rebase 上游更新"
             else
-              echo "Rebase failed — using upstream as source of truth"
+              echo "Rebase 失败 — 使用上游作为最终来源"
               git rebase --abort || true
               git merge upstream/main -X theirs --no-edit || true
             fi
@@ -87,22 +87,22 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               "https://api.github.com/repos/${REPO}/actions/workflows/${WF}/disable" || echo "000")
             if [ "$http_code" = "204" ]; then
-              echo "Disabled workflow via API: $WF"
+              echo "已通过 API 禁用工作流: $WF"
               API_DISABLED=true
             else
-              echo "API disable returned HTTP $http_code for $WF"
+              echo "API 禁用返回 HTTP $http_code，禁用 $WF 失败"
             fi
           else
-            echo "No token available for API; skipping API disable"
+            echo "未提供令牌，跳过 API 禁用"
           fi
 
           if [ "$API_DISABLED" = "false" ]; then
             path=".github/workflows/${WF}"
             if [ -f "$path" ]; then
               mv "$path" "${path}.disabled"
-              echo "Renamed workflow to disable: ${path} -> ${path}.disabled"
+              echo "已通过重命名禁用工作流: ${path} -> ${path}.disabled"
             else
-              echo "Workflow file not found: ${path}"
+              echo "未找到工作流文件: ${path}"
             fi
           fi
 
@@ -114,7 +114,7 @@ jobs:
           set -euo pipefail
           TARGET="Scripts/diy.sh"
           if [ ! -f "$TARGET" ]; then
-            echo "Target $TARGET not found — skipping modifications"
+            echo "未找到目标文件 $TARGET — 跳过修改"
             exit 0
           fi
 
@@ -135,7 +135,7 @@ jobs:
           if ! grep -q 'Fix PPP / UPnP issues' "$TARGET"; then
             {
               echo "#######################################"
-              echo "# Fix PPP / UPnP issues"
+              echo "# 修复 PPP / UPnP 问题"
               echo "#######################################"
               echo "mkdir -p package/base-files/files/etc/uci-defaults"
               echo "cat << 'EOF' > package/base-files/files/etc/uci-defaults/99-custom-fixes"
@@ -149,7 +149,7 @@ jobs:
             } >> "$TARGET"
           fi
 
-          echo "Preview (tail 60):"
+          echo "预览修改内容 (tail 60):"
           tail -n 60 "$TARGET" || true
 
       - name: Verify modifications
@@ -158,11 +158,11 @@ jobs:
           set -euo pipefail
           T="Scripts/diy.sh"
           OK=0
-          if grep -q '"zn_m2" "redmi_ax5" "qihoo_360v6"' "$T"; then echo "mod1 ok"; OK=$((OK+1)); else echo "mod1 fail"; fi
-          if grep -q 'CONFIG_PACKAGE_git-http=y' "$T"; then echo "mod2 ok"; OK=$((OK+1)); else echo "mod2 fail"; fi
-          if grep -q 'Fix PPP / UPnP issues' "$T"; then echo "mod3 ok"; OK=$((OK+1)); else echo "mod3 fail"; fi
-          if grep -q 'CONFIG_PACKAGE_luci-app-dockerman=y' "$T"; then echo "mod4 ok"; OK=$((OK+1)); else echo "mod4 fail"; fi
-          echo "Passed $OK/4"
+          if grep -q '"zn_m2" "redmi_ax5" "qihoo_360v6"' "$T"; then echo "mod1 正确"; OK=$((OK+1)); else echo "mod1 失败"; fi
+          if grep -q 'CONFIG_PACKAGE_git-http=y' "$T"; then echo "mod2 正确"; OK=$((OK+1)); else echo "mod2 失败"; fi
+          if grep -q 'Fix PPP / UPnP issues' "$T"; then echo "mod3 正确"; OK=$((OK+1)); else echo "mod3 失败"; fi
+          if grep -q 'CONFIG_PACKAGE_luci-app-dockerman=y' "$T"; then echo "mod4 正确"; OK=$((OK+1)); else echo "mod4 失败"; fi
+          echo "通过 $OK/4"
 
       - name: Commit and push changes
         if: steps.check_updates.outputs.has_updates == 'true'
@@ -174,7 +174,7 @@ jobs:
           git add -A
           if git diff --cached --quiet; then
             echo "pushed=false" >> $GITHUB_OUTPUT
-            echo "No changes to commit"
+            echo "无修改需要提交"
           else
             git commit -m "chore: sync from upstream and apply modifications"
             if ! git pull origin main --rebase; then
@@ -188,15 +188,15 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          echo "===== SUMMARY ====="
+          echo "===== 总结 ====="
           if [ "${{ steps.check_updates.outputs.has_updates }}" = "true" ]; then
-            echo "Upstream updates processed."
+            echo "已处理上游更新。"
             if [ "${{ steps.push_changes.outputs.pushed }}" = "true" ]; then
-              echo "Changes pushed."
+              echo "修改已推送。"
             else
-              echo "No push performed or nothing to push."
+              echo "没有推送操作或无修改内容。"
             fi
           else
-            echo "No upstream updates."
+            echo "未检测到上游更新。"
           fi
-          echo "Disabled target workflow: OWRT-ALL.yml (API preferred; rename fallback)."
+          echo "已禁用目标工作流: OWRT-ALL.yml (优先 API，失败则重命名)。"
