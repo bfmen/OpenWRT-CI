@@ -100,9 +100,9 @@ for w in data.get('workflows', []): \
           fi
           if [ -f ".github/workflows/OWRT-ALL.yml" ]; then
             mv ".github/workflows/OWRT-ALL.yml" ".github/workflows/OWRT-ALL.yml.disabled"
-            echo "⚠️ 已重命名以禁用 .github/workflows/OWRT-ALL.yml"
+            echo "⚠️ 已重命名以禁用 OWRT-ALL.yml"
           else
-            echo "⚠️ 未找到 .github/workflows/OWRT-ALL.yml 文件"
+            echo "⚠️ 未找到 OWRT-ALL.yml 文件"
 
       - name: Apply 4 modifications to Scripts/diy.sh
         if: ${{ steps.check_updates.outputs.has_updates == 'true' }}
@@ -116,15 +116,15 @@ except FileNotFoundError:
     print('错误: Scripts/diy.sh 文件不存在！')
     sys.exit(1)
 
-# 修改1
+# 修改1：keywords_to_delete
 content = re.sub(r'(\"smartdns\" \"kucat\" \"bootstrap\")\\n\\)', \
     r'\1 \"zn_m2\" \"redmi_ax5\" \"qihoo_360v6\" \"redmi_ax5-jdcloud\" \"link_nn6000-v2\" \"link_nn6000-v1\" \"cmiot_ax18\" \"anysafe_e1\"\\n)', content)
 
-# 修改2
+# 修改2：添加配置
 additions = '\t\"CONFIG_PACKAGE_git-http=y\"\\n\t\"CONFIG_PACKAGE_curl=y\"\\n\t\"CONFIG_PACKAGE_openssl-util=y\"\\n\t\"CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y\"\\n\t\"CONFIG_PACKAGE_kmod-usb-net-rndis=y\"'
 content = re.sub(r'(    \"CONFIG_PACKAGE_cifsmount=y\")\\n(\\))', r'\1\n' + additions + r'\n\2', content)
 
-# 修改3
+# 修改3：PPP/UPnP 修复
 if 'Fix PPP / UPnP issues' not in content:
     fix_section = \"\"\"\
 #######################################
@@ -142,7 +142,7 @@ chmod +x package/base-files/files/etc/uci-defaults/99-custom-fixes
 \"\"\"
     content += '\n' + fix_section
 
-# 修改4
+# 修改4：dockerman 改 y
 content = content.replace('\"CONFIG_PACKAGE_luci-app-dockerman=m\"', '\"CONFIG_PACKAGE_luci-app-dockerman=y\"')
 content = content.replace('\"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m\"', '\"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y\"')
 
