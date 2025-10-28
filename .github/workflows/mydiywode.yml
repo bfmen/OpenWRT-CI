@@ -1,9 +1,9 @@
 name: Sync Upstream and Apply Modifications
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
   schedule:
-    - cron: '0 2 * * *'  # UTC 每天 2 点
+    - cron: '0 2 * * *'
   push:
     branches:
       - main
@@ -12,170 +12,191 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   sync-and-modify:
     runs-on: ubuntu-latest
+    env:
+      REPO: ${{ github.repository }}
+      PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN != '' && secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Set up upstream remote
         run: |
-          git remote add upstream https://github.com/ysuolmai/OpenWRT-CI.git || true
+          git remote add upstream https://github.com/ysuolmai/OpenWRT-CI.git 2>/dev/null || true
           git remote -v
 
       - name: Fetch upstream changes
         run: |
           echo "Fetching from upstream..."
-          git fetch upstream
+          git fetch upstream --prune
 
       - name: Check for upstream updates
         id: check_updates
         run: |
-          echo "检查上游仓库是否有新提交..."
           NEW_COMMITS=$(git rev-list HEAD..upstream/main 2>/dev/null || echo "")
           if [ -n "$NEW_COMMITS" ]; then
             echo "has_updates=true" >> $GITHUB_OUTPUT
-            echo "✅ 发现上游新提交！准备同步..."
-            echo ""
-            echo "================================"
-            echo "上游新提交列表："
-            echo "================================"
-            git log HEAD..upstream/main --oneline --max-count=20
+            echo "::notice::Found upstream commits"
+            git --no-pager log --oneline HEAD..upstream/main --max-count=30 || true
           else
             echo "has_updates=false" >> $GITHUB_OUTPUT
-            echo "✅ 上游没有新提交。无需同步。"
+            echo "::notice::No upstream commits"
+          fi
 
       - name: Merge upstream changes
-        if: ${{ steps.check_updates.outputs.has_updates == 'true' }}
+        if: steps.check_updates.outputs.has_updates == 'true'
         run: |
-          echo "合并上游更改..."
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if git merge upstream/main --no-edit; then
-            echo "✓ 成功合并上游更改"
+            echo "Merged upstream via merge"
           else
-            echo "✗ 合并冲突，尝试使用 rebase"
+            echo "Merge conflict — trying rebase"
             git merge --abort || true
             if git rebase upstream/main; then
-              echo "✓ 成功 rebase 上游更改"
+              echo "Rebased upstream"
             else
-              echo "✗ Rebase 失败，使用 theirs 策略"
+              echo "Rebase failed — using upstream as source of truth"
               git rebase --abort || true
-              git merge upstream/main -X theirs --no-edit
-              echo "⚠ 使用上游版本解决冲突"
+              git merge upstream/main -X theirs --no-edit || true
+            fi
+          fi
 
-      - name: Disable OWRT-ALL workflow
-        if: ${{ steps.check_updates.outputs.has_updates == 'true' }}
+      - name: Disable OWRT-ALL workflow (API then rename)
+        if: steps.check_updates.outputs.has_updates == 'true'
         env:
           PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          WF="OWRT-ALL.yml"
           TOKEN="${PAT_TOKEN:-$GITHUB_TOKEN}"
-          echo "检查并禁用 OWRT-ALL.yml 工作流..."
-          resp=$(curl -s -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${REPO}/actions/workflows")
-          WF_ID=$(python3 -c "import sys,json; data=json.load(sys.stdin); \
-for w in data.get('workflows', []): \
-    if w.get('path','').endswith('OWRT-ALL.yml') or w.get('name','').lower().find('owrt-all') != -1: \
-        print(w.get('id')); sys.exit(0)" <<< "$resp")
-          if [ -n "$WF_ID" ]; then
-            echo "找到 OWRT-ALL 工作流 ID: $WF_ID"
-            code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
+          API_DISABLED=false
+          if [ -n "$TOKEN" ]; then
+            http_code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
               -H "Authorization: token $TOKEN" \
               -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/repos/${REPO}/actions/workflows/${WF_ID}/disable")
-            if [ "$code" = "204" ]; then
-              echo "✅ 已通过 API 成功禁用 OWRT-ALL 工作流"
+              "https://api.github.com/repos/${REPO}/actions/workflows/${WF}/disable" || echo "000")
+            if [ "$http_code" = "204" ]; then
+              echo "Disabled workflow via API: $WF"
+              API_DISABLED=true
             else
-              echo "⚠️ API 禁用失败，HTTP 状态: $code"
+              echo "API disable returned HTTP $http_code for $WF"
+            fi
+          else
+            echo "No token available for API; skipping API disable"
+          fi
+
+          if [ "$API_DISABLED" = "false" ]; then
+            path=".github/workflows/${WF}"
+            if [ -f "$path" ]; then
+              mv "$path" "${path}.disabled"
+              echo "Renamed workflow to disable: ${path} -> ${path}.disabled"
+            else
+              echo "Workflow file not found: ${path}"
             fi
           fi
-          if [ -f ".github/workflows/OWRT-ALL.yml" ]; then
-            mv ".github/workflows/OWRT-ALL.yml" ".github/workflows/OWRT-ALL.yml.disabled"
-            echo "⚠️ 已重命名以禁用 OWRT-ALL.yml"
-          else
-            echo "⚠️ 未找到 OWRT-ALL.yml 文件"
 
-      - name: Apply 4 modifications to Scripts/diy.sh
-        if: ${{ steps.check_updates.outputs.has_updates == 'true' }}
+          ls -la .github/workflows/ || true
+
+      - name: Apply modifications to Scripts/diy.sh
+        if: steps.check_updates.outputs.has_updates == 'true'
         run: |
-          python3 -c "
-import re, sys
-try:
-    with open('Scripts/diy.sh', 'r', encoding='utf-8') as f:
-        content = f.read()
-except FileNotFoundError:
-    print('错误: Scripts/diy.sh 文件不存在！')
-    sys.exit(1)
+          set -euo pipefail
+          TARGET="Scripts/diy.sh"
+          if [ ! -f "$TARGET" ]; then
+            echo "Target $TARGET not found — skipping modifications"
+            exit 0
+          fi
 
-# 修改1：keywords_to_delete
-content = re.sub(r'(\"smartdns\" \"kucat\" \"bootstrap\")\\n\\)', \
-    r'\1 \"zn_m2\" \"redmi_ax5\" \"qihoo_360v6\" \"redmi_ax5-jdcloud\" \"link_nn6000-v2\" \"link_nn6000-v1\" \"cmiot_ax18\" \"anysafe_e1\"\\n)', content)
+          cp -a "$TARGET" "${TARGET}.bak" || true
 
-# 修改2：添加配置
-additions = '\t\"CONFIG_PACKAGE_git-http=y\"\\n\t\"CONFIG_PACKAGE_curl=y\"\\n\t\"CONFIG_PACKAGE_openssl-util=y\"\\n\t\"CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y\"\\n\t\"CONFIG_PACKAGE_kmod-usb-net-rndis=y\"'
-content = re.sub(r'(    \"CONFIG_PACKAGE_cifsmount=y\")\\n(\\))', r'\1\n' + additions + r'\n\2', content)
+          # 1) Append/replace keywords block if matched
+          perl -0777 -pe 's/("smartdns" "kucat" "bootstrap")\n\)/$1 "zn_m2" "redmi_ax5" "qihoo_360v6" "redmi_ax5-jdcloud" "link_nn6000-v2" "link_nn6000-v1" "cmiot_ax18" "anysafe_e1"\n\)/s' -i "$TARGET" || true
 
-# 修改3：PPP/UPnP 修复
-if 'Fix PPP / UPnP issues' not in content:
-    fix_section = \"\"\"\
-#######################################
-# Fix PPP / UPnP issues
-#######################################
-mkdir -p package/base-files/files/etc/uci-defaults
-cat << 'EOF' > package/base-files/files/etc/uci-defaults/99-custom-fixes
-#!/bin/sh
-sed -i '8c maxfail 1' /etc/ppp/options
-sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh
-sed -i '10c option external_ip \"59.111.160.244\"' /etc/config/upnpd
-exit 0
-EOF
-chmod +x package/base-files/files/etc/uci-defaults/99-custom-fixes
-\"\"\"
-    content += '\n' + fix_section
+          # 2) Insert extra CONFIG entries near CONFIG_PACKAGE_cifsmount=y if not present
+          if ! grep -q 'CONFIG_PACKAGE_git-http=y' "$TARGET"; then
+            perl -0777 -pe 's/( {4}"CONFIG_PACKAGE_cifsmount=y")\n(\))/ $1 . "\n\t\"CONFIG_PACKAGE_git-http=y\"\n\t\"CONFIG_PACKAGE_curl=y\"\n\t\"CONFIG_PACKAGE_openssl-util=y\"\n\t\"CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y\"\n\t\"CONFIG_PACKAGE_kmod-usb-net-rndis=y\"\n" . $2 /es' -i "$TARGET" || true
+          fi
 
-# 修改4：dockerman 改 y
-content = content.replace('\"CONFIG_PACKAGE_luci-app-dockerman=m\"', '\"CONFIG_PACKAGE_luci-app-dockerman=y\"')
-content = content.replace('\"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m\"', '\"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y\"')
+          # 4) Change dockerman from m to y
+          perl -pi -e 's/"CONFIG_PACKAGE_luci-app-dockerman=m"/"CONFIG_PACKAGE_luci-app-dockerman=y"/g; s/"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m"/"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y"/g' "$TARGET" || true
 
-with open('Scripts/diy.sh', 'w', encoding='utf-8') as f:
-    f.write(content)
-print('✅ 所有修改已完成')
-"
+          # 3) Append PPP/UPnP fix script snippet if not present
+          if ! grep -q 'Fix PPP / UPnP issues' "$TARGET"; then
+            {
+              echo "#######################################"
+              echo "# Fix PPP / UPnP issues"
+              echo "#######################################"
+              echo "mkdir -p package/base-files/files/etc/uci-defaults"
+              echo "cat << 'EOF' > package/base-files/files/etc/uci-defaults/99-custom-fixes"
+              echo "#!/bin/sh"
+              echo "sed -i '8c maxfail 1' /etc/ppp/options"
+              echo "sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh"
+              echo "sed -i '10c option external_ip \"59.111.160.244\"' /etc/config/upnpd"
+              echo "exit 0"
+              echo "EOF"
+              echo "chmod +x package/base-files/files/etc/uci-defaults/99-custom-fixes"
+            } >> "$TARGET"
+          fi
+
+          echo "Preview (tail 60):"
+          tail -n 60 "$TARGET" || true
+
+      - name: Verify modifications
+        if: steps.check_updates.outputs.has_updates == 'true'
+        run: |
+          set -euo pipefail
+          T="Scripts/diy.sh"
+          OK=0
+          if grep -q '"zn_m2" "redmi_ax5" "qihoo_360v6"' "$T"; then echo "mod1 ok"; OK=$((OK+1)); else echo "mod1 fail"; fi
+          if grep -q 'CONFIG_PACKAGE_git-http=y' "$T"; then echo "mod2 ok"; OK=$((OK+1)); else echo "mod2 fail"; fi
+          if grep -q 'Fix PPP / UPnP issues' "$T"; then echo "mod3 ok"; OK=$((OK+1)); else echo "mod3 fail"; fi
+          if grep -q 'CONFIG_PACKAGE_luci-app-dockerman=y' "$T"; then echo "mod4 ok"; OK=$((OK+1)); else echo "mod4 fail"; fi
+          echo "Passed $OK/4"
 
       - name: Commit and push changes
-        if: ${{ steps.check_updates.outputs.has_updates == 'true' }}
+        if: steps.check_updates.outputs.has_updates == 'true'
+        id: push_changes
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           if git diff --cached --quiet; then
-            echo "ℹ️ 没有需要提交的更改"
+            echo "pushed=false" >> $GITHUB_OUTPUT
+            echo "No changes to commit"
           else
-            git commit -m "chore: sync upstream + apply diy.sh modifications + disable OWRT-ALL workflow"
-            git pull origin main --rebase || git rebase --abort || true
-            git push origin main
-            echo "✅ 推送成功"
+            git commit -m "chore: sync from upstream and apply modifications"
+            if ! git pull origin main --rebase; then
+              git rebase --abort || true
+              git pull origin main --no-rebase || true
+            fi
+            git push origin main || true
+            echo "pushed=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Summary
         if: always()
         run: |
-          echo "================================"
-          echo "📊 执行摘要"
-          echo "================================"
-          if [ "${{ steps.check_updates.outputs.has_updates }}" == "true" ]; then
-            echo "✅ 上游有更新并已同步"
-            echo "✅ 已禁用 OWRT-ALL.yml 工作流"
-            echo "✅ 已修改 Scripts/diy.sh"
+          echo "===== SUMMARY ====="
+          if [ "${{ steps.check_updates.outputs.has_updates }}" = "true" ]; then
+            echo "Upstream updates processed."
+            if [ "${{ steps.push_changes.outputs.pushed }}" = "true" ]; then
+              echo "Changes pushed."
+            else
+              echo "No push performed or nothing to push."
+            fi
           else
-            echo "ℹ️ 无上游更新"
+            echo "No upstream updates."
           fi
-          echo "================================"
+          echo "Disabled target workflow: OWRT-ALL.yml (API preferred; rename fallback)."
