@@ -1,9 +1,9 @@
 name: Sync Upstream and Apply Modifications
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 2 * * *'  # 每天凌晨2点（UTC时间）执行
   push:
     branches:
       - main
@@ -12,191 +12,211 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
   sync-and-modify:
     runs-on: ubuntu-latest
-    env:
-      REPO: ${{ github.repository }}
-      PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.PAT_TOKEN != '' && secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Set up upstream remote
-        run: |
-          git remote add upstream https://github.com/ysuolmai/OpenWRT-CI.git 2>/dev/null || true
-          git remote -v
+    - name: Set up upstream remote
+      run: |
+        git remote add upstream https://github.com/ysuolmai/OpenWRT-CI.git || true
+        git remote -v
 
-      - name: Fetch upstream changes
-        run: |
-          echo "Fetching from upstream..."
-          git fetch upstream --prune
+    - name: Fetch upstream changes
+      run: |
+        echo "Fetching from upstream..."
+        git fetch upstream
 
-      - name: Check for upstream updates
-        id: check_updates
-        run: |
-          NEW_COMMITS=$(git rev-list HEAD..upstream/main 2>/dev/null || echo "")
-          if [ -n "$NEW_COMMITS" ]; then
-            echo "has_updates=true" >> $GITHUB_OUTPUT
-            echo "::notice::Found upstream commits"
-            git --no-pager log --oneline HEAD..upstream/main --max-count=30 || true
+    - name: Check for upstream updates
+      id: check_updates
+      run: |
+        echo "检查上游仓库是否有新提交..."
+        NEW_COMMITS=$(git rev-list HEAD..upstream/main 2>/dev/null || echo "")
+        if [ -n "$NEW_COMMITS" ]; then
+          echo "has_updates=true" >> $GITHUB_OUTPUT
+          echo "✅ 发现上游新提交，准备同步..."
+          git log HEAD..upstream/main --oneline --max-count=20
+        else
+          echo "has_updates=false" >> $GITHUB_OUTPUT
+          echo "✅ 上游没有新提交。"
+        fi
+
+    - name: Merge upstream changes
+      if: steps.check_updates.outputs.has_updates == 'true'
+      run: |
+        echo "合并上游更改..."
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        if git merge upstream/main --no-edit; then
+          echo "✓ 成功合并上游更改"
+        else
+          echo "✗ 合并冲突，尝试使用 rebase"
+          git merge --abort
+          if git rebase upstream/main; then
+            echo "✓ 成功 rebase 上游更改"
           else
-            echo "has_updates=false" >> $GITHUB_OUTPUT
-            echo "::notice::No upstream commits"
+            echo "⚠ Rebase 失败，强制使用上游版本"
+            git rebase --abort
+            git merge upstream/main -X theirs --no-edit
           fi
+        fi
 
-      - name: Merge upstream changes
-        if: steps.check_updates.outputs.has_updates == 'true'
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git merge upstream/main --no-edit; then
-            echo "Merged upstream via merge"
-          else
-            echo "Merge conflict — trying rebase"
-            git merge --abort || true
-            if git rebase upstream/main; then
-              echo "Rebased upstream"
-            else
-              echo "Rebase failed — using upstream as source of truth"
-              git rebase --abort || true
-              git merge upstream/main -X theirs --no-edit || true
-            fi
-          fi
+    - name: Disable OWRT-ALL workflow (by API or rename fallback)
+      if: steps.check_updates.outputs.has_updates == 'true'
+      env:
+        PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+        TOKEN="${PAT_TOKEN:-$GITHUB_TOKEN}"
 
-      - name: Disable OWRT-ALL workflow (API then rename)
-        if: steps.check_updates.outputs.has_updates == 'true'
-        env:
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          WF="OWRT-ALL.yml"
-          TOKEN="${PAT_TOKEN:-$GITHUB_TOKEN}"
-          API_DISABLED=false
-          if [ -n "$TOKEN" ]; then
-            http_code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
-              -H "Authorization: token $TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/repos/${REPO}/actions/workflows/${WF}/disable" || echo "000")
-            if [ "$http_code" = "204" ]; then
-              echo "Disabled workflow via API: $WF"
-              API_DISABLED=true
-            else
-              echo "API disable returned HTTP $http_code for $WF"
-            fi
-          else
-            echo "No token available for API; skipping API disable"
-          fi
+        echo "🔍 获取 workflow 列表..."
+        resp=$(curl -s -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/actions/workflows")
 
-          if [ "$API_DISABLED" = "false" ]; then
-            path=".github/workflows/${WF}"
-            if [ -f "$path" ]; then
-              mv "$path" "${path}.disabled"
-              echo "Renamed workflow to disable: ${path} -> ${path}.disabled"
-            else
-              echo "Workflow file not found: ${path}"
-            fi
-          fi
-
-          ls -la .github/workflows/ || true
-
-      - name: Apply modifications to Scripts/diy.sh
-        if: steps.check_updates.outputs.has_updates == 'true'
-        run: |
-          set -euo pipefail
-          TARGET="Scripts/diy.sh"
-          if [ ! -f "$TARGET" ]; then
-            echo "Target $TARGET not found — skipping modifications"
+        WF_ID=$(printf '%s' "$resp" | python3 - <<'PY'
+import sys,json
+data=json.load(sys.stdin)
+for w in data.get("workflows", []):
+    path = (w.get("path") or "").lower()
+    name = (w.get("name") or "").lower()
+    if "owrt-all.yml" in path or "owrt-all" in name:
+        print(w.get("id"))
+        sys.exit(0)
+PY
+)
+        if [ -n "$WF_ID" ]; then
+          echo "找到 OWRT-ALL workflow ID: $WF_ID"
+          http_code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
+            -H "Authorization: token $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/actions/workflows/${WF_ID}/disable" || echo "000")
+          if [ "$http_code" = "204" ]; then
+            echo "✅ 已通过 API 禁用 OWRT-ALL"
             exit 0
-          fi
-
-          cp -a "$TARGET" "${TARGET}.bak" || true
-
-          # 1) Append/replace keywords block if matched
-          perl -0777 -pe 's/("smartdns" "kucat" "bootstrap")\n\)/$1 "zn_m2" "redmi_ax5" "qihoo_360v6" "redmi_ax5-jdcloud" "link_nn6000-v2" "link_nn6000-v1" "cmiot_ax18" "anysafe_e1"\n\)/s' -i "$TARGET" || true
-
-          # 2) Insert extra CONFIG entries near CONFIG_PACKAGE_cifsmount=y if not present
-          if ! grep -q 'CONFIG_PACKAGE_git-http=y' "$TARGET"; then
-            perl -0777 -pe 's/( {4}"CONFIG_PACKAGE_cifsmount=y")\n(\))/ $1 . "\n\t\"CONFIG_PACKAGE_git-http=y\"\n\t\"CONFIG_PACKAGE_curl=y\"\n\t\"CONFIG_PACKAGE_openssl-util=y\"\n\t\"CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y\"\n\t\"CONFIG_PACKAGE_kmod-usb-net-rndis=y\"\n" . $2 /es' -i "$TARGET" || true
-          fi
-
-          # 4) Change dockerman from m to y
-          perl -pi -e 's/"CONFIG_PACKAGE_luci-app-dockerman=m"/"CONFIG_PACKAGE_luci-app-dockerman=y"/g; s/"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m"/"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y"/g' "$TARGET" || true
-
-          # 3) Append PPP/UPnP fix script snippet if not present
-          if ! grep -q 'Fix PPP / UPnP issues' "$TARGET"; then
-            {
-              echo "#######################################"
-              echo "# Fix PPP / UPnP issues"
-              echo "#######################################"
-              echo "mkdir -p package/base-files/files/etc/uci-defaults"
-              echo "cat << 'EOF' > package/base-files/files/etc/uci-defaults/99-custom-fixes"
-              echo "#!/bin/sh"
-              echo "sed -i '8c maxfail 1' /etc/ppp/options"
-              echo "sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh"
-              echo "sed -i '10c option external_ip \"59.111.160.244\"' /etc/config/upnpd"
-              echo "exit 0"
-              echo "EOF"
-              echo "chmod +x package/base-files/files/etc/uci-defaults/99-custom-fixes"
-            } >> "$TARGET"
-          fi
-
-          echo "Preview (tail 60):"
-          tail -n 60 "$TARGET" || true
-
-      - name: Verify modifications
-        if: steps.check_updates.outputs.has_updates == 'true'
-        run: |
-          set -euo pipefail
-          T="Scripts/diy.sh"
-          OK=0
-          if grep -q '"zn_m2" "redmi_ax5" "qihoo_360v6"' "$T"; then echo "mod1 ok"; OK=$((OK+1)); else echo "mod1 fail"; fi
-          if grep -q 'CONFIG_PACKAGE_git-http=y' "$T"; then echo "mod2 ok"; OK=$((OK+1)); else echo "mod2 fail"; fi
-          if grep -q 'Fix PPP / UPnP issues' "$T"; then echo "mod3 ok"; OK=$((OK+1)); else echo "mod3 fail"; fi
-          if grep -q 'CONFIG_PACKAGE_luci-app-dockerman=y' "$T"; then echo "mod4 ok"; OK=$((OK+1)); else echo "mod4 fail"; fi
-          echo "Passed $OK/4"
-
-      - name: Commit and push changes
-        if: steps.check_updates.outputs.has_updates == 'true'
-        id: push_changes
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "pushed=false" >> $GITHUB_OUTPUT
-            echo "No changes to commit"
           else
-            git commit -m "chore: sync from upstream and apply modifications"
-            if ! git pull origin main --rebase; then
-              git rebase --abort || true
-              git pull origin main --no-rebase || true
-            fi
-            git push origin main || true
-            echo "pushed=true" >> $GITHUB_OUTPUT
+            echo "⚠ API 禁用失败 (HTTP $http_code)，使用重命名方式"
           fi
+        else
+          echo "⚠ 未找到 OWRT-ALL workflow，尝试重命名文件"
+        fi
 
-      - name: Summary
-        if: always()
-        run: |
-          echo "===== SUMMARY ====="
-          if [ "${{ steps.check_updates.outputs.has_updates }}" = "true" ]; then
-            echo "Upstream updates processed."
-            if [ "${{ steps.push_changes.outputs.pushed }}" = "true" ]; then
-              echo "Changes pushed."
-            else
-              echo "No push performed or nothing to push."
-            fi
-          else
-            echo "No upstream updates."
-          fi
-          echo "Disabled target workflow: OWRT-ALL.yml (API preferred; rename fallback)."
+        WF_PATH=".github/workflows/OWRT-ALL.yml"
+        if [ -f "$WF_PATH" ]; then
+          mv "$WF_PATH" "${WF_PATH}.disabled"
+          echo "✅ 已重命名 $WF_PATH → ${WF_PATH}.disabled"
+        else
+          echo "⚠ 未找到 $WF_PATH"
+        fi
+
+    - name: Apply 4 modifications to Scripts/diy.sh
+      if: steps.check_updates.outputs.has_updates == 'true'
+      run: |
+        cat > modify.py << 'ENDPY'
+import re, sys
+try:
+    with open('Scripts/diy.sh', 'r', encoding='utf-8') as f:
+        content = f.read()
+except FileNotFoundError:
+    print("错误: Scripts/diy.sh 文件不存在！")
+    sys.exit(1)
+
+# 修改1：keywords_to_delete
+old_pattern = r'("smartdns" "kucat" "bootstrap")\n\)'
+new_replacement = r'\1 "zn_m2" "redmi_ax5" "qihoo_360v6" "redmi_ax5-jdcloud" "link_nn6000-v2" "link_nn6000-v1" "cmiot_ax18" "anysafe_e1"\n)'
+if re.search(old_pattern, content):
+    content = re.sub(old_pattern, new_replacement, content)
+    print("✓ 修改1完成：更新 keywords_to_delete 数组")
+
+# 修改2：添加配置项
+additions = '\t"CONFIG_PACKAGE_git-http=y"\n\t"CONFIG_PACKAGE_curl=y"\n\t"CONFIG_PACKAGE_openssl-util=y"\n\t"CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y"\n\t"CONFIG_PACKAGE_kmod-usb-net-rndis=y"'
+config_pattern = r'(    "CONFIG_PACKAGE_cifsmount=y")\n(\))'
+if re.search(config_pattern, content) and 'CONFIG_PACKAGE_git-http=y' not in content:
+    content = re.sub(config_pattern, r'\1\n' + additions + r'\n\2', content)
+    print("✓ 修改2完成：添加额外配置项")
+
+# 修改3：PPP/UPnP 修复
+if "Fix PPP / UPnP issues" not in content:
+    fix_section = """
+#######################################
+# Fix PPP / UPnP issues
+#######################################
+mkdir -p package/base-files/files/etc/uci-defaults
+cat << 'EOF' > package/base-files/files/etc/uci-defaults/99-custom-fixes
+#!/bin/sh
+sed -i '8c maxfail 1' /etc/ppp/options
+sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh
+sed -i '10c option external_ip "59.111.160.244"' /etc/config/upnpd
+exit 0
+EOF
+chmod +x package/base-files/files/etc/uci-defaults/99-custom-fixes"""
+    content += "\n" + fix_section + "\n"
+    print("✓ 修改3完成：添加 PPP/UPnP 修复脚本")
+
+# 修改4：dockerman 改为 y
+changes_made = 0
+if '"CONFIG_PACKAGE_luci-app-dockerman=m"' in content:
+    content = content.replace('"CONFIG_PACKAGE_luci-app-dockerman=m"', '"CONFIG_PACKAGE_luci-app-dockerman=y"')
+    changes_made += 1
+if '"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m"' in content:
+    content = content.replace('"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m"', '"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y"')
+    changes_made += 1
+if changes_made:
+    print(f"✓ 修改4完成：dockerman 改为内置 ({changes_made} 处修改)")
+
+with open('Scripts/diy.sh', 'w', encoding='utf-8') as f:
+    f.write(content)
+print("✅ 所有修改完成！")
+ENDPY
+        python3 modify.py
+        rm modify.py
+
+    - name: Verify modifications
+      if: steps.check_updates.outputs.has_updates == 'true'
+      run: |
+        verify_count=0
+        total=4
+        grep -q '"zn_m2" "redmi_ax5"' Scripts/diy.sh && ((verify_count++))
+        grep -q 'CONFIG_PACKAGE_git-http=y' Scripts/diy.sh && ((verify_count++))
+        grep -q 'Fix PPP / UPnP issues' Scripts/diy.sh && ((verify_count++))
+        grep -q 'CONFIG_PACKAGE_luci-app-dockerman=y' Scripts/diy.sh && ((verify_count++))
+        echo "验证通过: $verify_count / $total"
+
+    - name: Commit and push changes
+      if: steps.check_updates.outputs.has_updates == 'true'
+      id: push_changes
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add -A
+        if git diff --cached --quiet; then
+          echo "pushed=false" >> $GITHUB_OUTPUT
+          echo "ℹ️ 无需提交"
+        else
+          git commit -m "chore: sync from upstream and apply modifications"
+          git pull origin main --rebase || git pull origin main --no-rebase
+          git push origin main
+          echo "pushed=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Summary
+      if: always()
+      run: |
+        echo "================================"
+        echo "📊 工作流执行摘要"
+        echo "================================"
+        if [ "${{ steps.check_updates.outputs.has_updates }}" == "true" ]; then
+          echo "✅ 已同步上游并应用修改"
+          echo "✅ 已禁用 OWRT-ALL.yml"
+          echo "✅ 验证修改完成"
+        else
+          echo "ℹ️ 上游无更新"
+        fi
+        echo "执行时间: $(date)"
