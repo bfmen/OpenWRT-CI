@@ -80,16 +80,12 @@ jobs:
           set -euo pipefail
           TOKEN="${PAT_TOKEN:-$GITHUB_TOKEN}"
           echo "检查并禁用 OWRT-ALL.yml 工作流..."
-          resp=$(curl -s -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/actions/workflows")
-          WF_ID=$(printf '%s' "$resp" | python3 - <<'PY'
-import sys,json
-data=json.load(sys.stdin)
-for w in data.get("workflows", []):
-    if w.get("path", "").endswith("OWRT-ALL.yml") or w.get("name", "").lower().find("owrt-all") != -1:
-        print(w.get("id"))
-        sys.exit(0)
-PY
-)
+          resp=$(curl -s -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/actions/workflows")
+          WF_ID=$(python3 -c "import sys,json; data=json.load(sys.stdin); \
+for w in data.get('workflows', []): \
+    if w.get('path','').endswith('OWRT-ALL.yml') or w.get('name','').lower().find('owrt-all') != -1: \
+        print(w.get('id')); sys.exit(0)" <<< "$resp")
           if [ -n "$WF_ID" ]; then
             echo "找到 OWRT-ALL 工作流 ID: $WF_ID"
             code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
@@ -111,27 +107,26 @@ PY
       - name: Apply 4 modifications to Scripts/diy.sh
         if: ${{ steps.check_updates.outputs.has_updates == 'true' }}
         run: |
-          cat > modify.py << 'ENDPY'
+          python3 -c "
 import re, sys
 try:
     with open('Scripts/diy.sh', 'r', encoding='utf-8') as f:
         content = f.read()
 except FileNotFoundError:
-    print("错误: Scripts/diy.sh 文件不存在！")
+    print('错误: Scripts/diy.sh 文件不存在！')
     sys.exit(1)
 
 # 修改1
-old_pattern = r'("smartdns" "kucat" "bootstrap")\n\)'
-new_replacement = r'\1 "zn_m2" "redmi_ax5" "qihoo_360v6" "redmi_ax5-jdcloud" "link_nn6000-v2" "link_nn6000-v1" "cmiot_ax18" "anysafe_e1"\n)'
-content = re.sub(old_pattern, new_replacement, content)
+content = re.sub(r'(\"smartdns\" \"kucat\" \"bootstrap\")\\n\\)', \
+    r'\1 \"zn_m2\" \"redmi_ax5\" \"qihoo_360v6\" \"redmi_ax5-jdcloud\" \"link_nn6000-v2\" \"link_nn6000-v1\" \"cmiot_ax18\" \"anysafe_e1\"\\n)', content)
 
 # 修改2
-additions = '\t"CONFIG_PACKAGE_git-http=y"\n\t"CONFIG_PACKAGE_curl=y"\n\t"CONFIG_PACKAGE_openssl-util=y"\n\t"CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y"\n\t"CONFIG_PACKAGE_kmod-usb-net-rndis=y"'
-content = re.sub(r'(    "CONFIG_PACKAGE_cifsmount=y")\n(\))', r'\1\n' + additions + r'\n\2', content)
+additions = '\t\"CONFIG_PACKAGE_git-http=y\"\\n\t\"CONFIG_PACKAGE_curl=y\"\\n\t\"CONFIG_PACKAGE_openssl-util=y\"\\n\t\"CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y\"\\n\t\"CONFIG_PACKAGE_kmod-usb-net-rndis=y\"'
+content = re.sub(r'(    \"CONFIG_PACKAGE_cifsmount=y\")\\n(\\))', r'\1\n' + additions + r'\n\2', content)
 
 # 修改3
-if "Fix PPP / UPnP issues" not in content:
-    fix_section = """
+if 'Fix PPP / UPnP issues' not in content:
+    fix_section = \"\"\"\
 #######################################
 # Fix PPP / UPnP issues
 #######################################
@@ -140,23 +135,21 @@ cat << 'EOF' > package/base-files/files/etc/uci-defaults/99-custom-fixes
 #!/bin/sh
 sed -i '8c maxfail 1' /etc/ppp/options
 sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh
-sed -i '10c option external_ip "59.111.160.244"' /etc/config/upnpd
+sed -i '10c option external_ip \"59.111.160.244\"' /etc/config/upnpd
 exit 0
 EOF
 chmod +x package/base-files/files/etc/uci-defaults/99-custom-fixes
-"""
+\"\"\"
     content += '\n' + fix_section
 
 # 修改4
-content = content.replace('"CONFIG_PACKAGE_luci-app-dockerman=m"', '"CONFIG_PACKAGE_luci-app-dockerman=y"')
-content = content.replace('"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m"', '"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y"')
+content = content.replace('\"CONFIG_PACKAGE_luci-app-dockerman=m\"', '\"CONFIG_PACKAGE_luci-app-dockerman=y\"')
+content = content.replace('\"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m\"', '\"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y\"')
 
 with open('Scripts/diy.sh', 'w', encoding='utf-8') as f:
     f.write(content)
-print("✅ 所有修改已完成")
-ENDPY
-          python3 modify.py
-          rm -f modify.py
+print('✅ 所有修改已完成')
+"
 
       - name: Commit and push changes
         if: ${{ steps.check_updates.outputs.has_updates == 'true' }}
