@@ -100,83 +100,34 @@ jobs:
           echo "当前工作流文件："
           ls -la .github/workflows/ | grep -E '\.ya?ml' || true
 
-      - name: Apply 4 modifications to Scripts/diy.sh
+      - name: Apply 4 modifications to Scripts/diy.sh (no heredoc)
         if: steps.check_updates.outputs.has_updates == 'true'
         run: |
-          # 生成并执行临时 Python 修改脚本（heredoc 标识符在列首）
-          cat > modify.py <<'ENDPY'
-import re
-import sys
-
-try:
-    with open('Scripts/diy.sh', 'r', encoding='utf-8') as f:
-        content = f.read()
-except FileNotFoundError:
-    print("错误: Scripts/diy.sh 文件不存在！")
-    sys.exit(1)
-
-# 修改1：替换 keywords_to_delete 数组
-old_pattern = r'("smartdns" "kucat" "bootstrap")\n\)'
-new_replacement = r'\1 "zn_m2" "redmi_ax5" "qihoo_360v6" "redmi_ax5-jdcloud" "link_nn6000-v2" "link_nn6000-v1" "cmiot_ax18" "anysafe_e1"\n)'
-if re.search(old_pattern, content):
-    content = re.sub(old_pattern, new_replacement, content)
-    print("✓ 修改1完成：更新 keywords_to_delete 数组")
-else:
-    print("⚠ 修改1跳过：未找到目标文本或已修改")
-
-# 修改2：添加新配置项（基于找到特定行）
-additions = '\t"CONFIG_PACKAGE_git-http=y"\n\t"CONFIG_PACKAGE_curl=y"\n\t"CONFIG_PACKAGE_openssl-util=y"\n\t"CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y"\n\t"CONFIG_PACKAGE_kmod-usb-net-rndis=y"'
-config_pattern = r'(    "CONFIG_PACKAGE_cifsmount=y")\n(\))'
-if re.search(config_pattern, content) and 'CONFIG_PACKAGE_git-http=y' not in content:
-    content = re.sub(config_pattern, r'\1\n' + additions + r'\n\2', content)
-    print("✓ 修改2完成：添加额外配置项")
-else:
-    print("⚠ 修改2跳过：未找到目标或已存在")
-
-# 修改3：添加 PPP/UPnP 修复脚本（作为字符串追加）
-if "Fix PPP / UPnP issues" not in content:
-    fix_section = """
-#######################################
-# Fix PPP / UPnP issues
-#######################################
-mkdir -p package/base-files/files/etc/uci-defaults
-cat << 'EOF' > package/base-files/files/etc/uci-defaults/99-custom-fixes
-#!/bin/sh
-# 修复拨号问题
-sed -i '8c maxfail 1' /etc/ppp/options
-sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh
-
-# 修复 upnp 问题
-sed -i '10c option external_ip "59.111.160.244"' /etc/config/upnpd
-
-exit 0
-EOF
-chmod +x package/base-files/files/etc/uci-defaults/99-custom-fixes"""
-    content = content.rstrip() + '\n' + fix_section + '\n'
-    print("✓ 修改3完成：添加 PPP/UPnP 修复脚本")
-else:
-    print("⚠ 修改3跳过：已存在")
-
-# 修改4：将 dockerman 从 m 改为 y
-changes_made = 0
-if '"CONFIG_PACKAGE_luci-app-dockerman=m"' in content:
-    content = content.replace('"CONFIG_PACKAGE_luci-app-dockerman=m"', '"CONFIG_PACKAGE_luci-app-dockerman=y"')
-    changes_made += 1
-if '"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m"' in content:
-    content = content.replace('"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m"', '"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y"')
-    changes_made += 1
-
-if changes_made > 0:
-    print(f"✓ 修改4完成：dockerman 改为内置 (y) - {changes_made} 处修改")
-else:
-    print("⚠ 修改4跳过：未找到或已修改")
-
-# 写回文件
-with open('Scripts/diy.sh', 'w', encoding='utf-8') as f:
-    f.write(content)
-
-print("✅ 所有修改处理完成！")
-ENDPY
+          # 使用 printf 逐行写入 modify.py，避免 heredoc 与 YAML 缩进冲突
+          printf '%s\n' "import re" "import sys" "" \
+          "try:" "    with open('Scripts/diy.sh', 'r', encoding='utf-8') as f:" "        content = f.read()" \
+          "except FileNotFoundError:" "    print('错误: Scripts/diy.sh 文件不存在！')" "    sys.exit(1)" "" \
+          "# 修改1：替换 keywords_to_delete 数组" \
+          "old_pattern = r'(\"smartdns\" \"kucat\" \"bootstrap\")\\n\\)'" \
+          "new_replacement = r'\\1 \"zn_m2\" \"redmi_ax5\" \"qihoo_360v6\" \"redmi_ax5-jdcloud\" \"link_nn6000-v2\" \"link_nn6000-v1\" \"cmiot_ax18\" \"anysafe_e1\"\\n)'" \
+          "" \
+          "if re.search(old_pattern, content):" "    content = re.sub(old_pattern, new_replacement, content)" "    print('✓ 修改1完成：更新 keywords_to_delete 数组')" \
+          "else:" "    print('⚠ 修改1跳过：未找到目标文本或已修改')" "" \
+          "# 修改2：添加新配置项（基于找到特定行）" \
+          "additions = '\\t\"CONFIG_PACKAGE_git-http=y\"\\n\\t\"CONFIG_PACKAGE_curl=y\"\\n\\t\"CONFIG_PACKAGE_openssl-util=y\"\\n\\t\"CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y\"\\n\\t\"CONFIG_PACKAGE_kmod-usb-net-rndis=y\"'" \
+          "config_pattern = r'(    \"CONFIG_PACKAGE_cifsmount=y\")\\n(\\))'" \
+          "if re.search(config_pattern, content) and 'CONFIG_PACKAGE_git-http=y' not in content:" "    content = re.sub(config_pattern, r'\\1\\n' + additions + r'\\n\\2', content)" "    print('✓ 修改2完成：添加额外配置项')" \
+          "else:" "    print('⚠ 修改2跳过：未找到目标或已存在')" "" \
+          "# 修改3：添加 PPP/UPnP 修复脚本（作为字符串追加）" \
+          "if \"Fix PPP / UPnP issues\" not in content:" "    fix_section = \"\"\"" \
+          "#######################################" "# Fix PPP / UPnP issues" "#######################################" "mkdir -p package/base-files/files/etc/uci-defaults" "cat << 'EOF' > package/base-files/files/etc/uci-defaults/99-custom-fixes" "#!/bin/sh" "# 修复拨号问题" "sed -i '8c maxfail 1' /etc/ppp/options" "sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh" "" "# 修复 upnp 问题" "sed -i '10c option external_ip \"59.111.160.244\"' /etc/config/upnpd" "" "exit 0" "EOF" "chmod +x package/base-files/files/etc/uci-defaults/99-custom-fixes\"\"\"" \
+          "    content = content.rstrip() + '\\n' + fix_section + '\\n'" "    print('✓ 修改3完成：添加 PPP/UPnP 修复脚本')" \
+          "else:" "    print('⚠ 修改3跳过：已存在')" "" \
+          "# 修改4：将 dockerman 从 m 改为 y" \
+          "changes_made = 0" "if '\"CONFIG_PACKAGE_luci-app-dockerman=m\"' in content:" "    content = content.replace('\"CONFIG_PACKAGE_luci-app-dockerman=m\"', '\"CONFIG_PACKAGE_luci-app-dockerman=y\"')" "    changes_made += 1" \
+          "if '\"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m\"' in content:" "    content = content.replace('\"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=m\"', '\"CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y\"')" "    changes_made += 1" \
+          "if changes_made > 0:" "    print(f'✓ 修改4完成：dockerman 改为内置 (y) - {changes_made} 处修改')" "else:" "    print('⚠ 修改4跳过：未找到或已修改')" "" \
+          "# 写回文件" "with open('Scripts/diy.sh', 'w', encoding='utf-8') as f:" "    f.write(content)" "" "print('✅ 所有修改处理完成！')" > modify.py
 
           python3 modify.py
           rm -f modify.py
