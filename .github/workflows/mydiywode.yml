@@ -8,7 +8,7 @@ on:
     branches:
       - main
     paths:
-      - '.github/workflows/mydiywode.yml'  # 注意：触发路径与该文件名一致
+      - '.github/workflows/mydiywode.yml'
 
 permissions:
   contents: write
@@ -239,7 +239,7 @@ ENDPY
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           if git diff --cached --quiet; then
-            echo "ℹ️  没有需要提交的更改"
+            echo "ℹ️ 没有需要提交的更改"
             echo "pushed=false" >> $GITHUB_OUTPUT
           else
             git commit -m "chore: sync from upstream and apply modifications
@@ -271,13 +271,14 @@ Automated by GitHub Actions"
             if [ "${{ steps.push_changes.outputs.pushed }}" == "true" ]; then
               echo "✅ 已推送到远程仓库"
             elif [ "${{ steps.push_changes.outputs.pushed }}" == "false" ]; then
-              echo "ℹ️  没有需要推送的更改"
+              echo "ℹ️ 没有需要推送的更改"
             else
-              echo "⚠️  推送状态未知"
+              echo "⚠️ 推送状态未知"
             fi
           else
-            echo "ℹ️  上游无更新，未执行任何操作"
+            echo "ℹ️ 上游无更新，未执行任何操作"
           fi
+
           echo ""
           echo "上游仓库: https://github.com/ysuolmai/OpenWRT-CI"
           echo "同步频率: 每天 UTC 02:00 (北京时间 10:00)"
