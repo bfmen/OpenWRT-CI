@@ -164,6 +164,7 @@ ENDPY
           rm -f modify.py
 
       - name: Commit and push changes
+        # 修复点：确保 'if' 和 'run' 与 'name' 的缩进级别完全相同
         if: ${{ steps.check_updates.outputs.has_updates == 'true' }}
         run: |
           git config user.name "github-actions[bot]"
@@ -178,6 +179,7 @@ ENDPY
             echo "✅ 推送成功"
 
       - name: Summary
+        # 修复点：确保 'if' 和 'run' 与 'name' 的缩进级别完全相同
         if: always()
         run: |
           echo "================================"
