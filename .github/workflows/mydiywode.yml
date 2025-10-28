@@ -3,7 +3,7 @@ name: Sync Upstream and Apply Modifications
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 2 * * *'  # UTC 每天 2 点
   push:
     branches:
       - main
@@ -98,7 +98,6 @@ PY
               "https://api.github.com/repos/${REPO}/actions/workflows/${WF_ID}/disable")
             if [ "$code" = "204" ]; then
               echo "✅ 已通过 API 成功禁用 OWRT-ALL 工作流"
-              exit 0
             else
               echo "⚠️ API 禁用失败，HTTP 状态: $code"
             fi
