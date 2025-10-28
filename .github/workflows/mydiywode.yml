@@ -252,6 +252,7 @@ chmod +x package/base-files/files/etc/uci-defaults/99-custom-fixes"""
 
     - name: Commit and push changes
       if: steps.check_updates.outputs.has_updates == 'true'
+      id: push_changes
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -260,6 +261,7 @@ chmod +x package/base-files/files/etc/uci-defaults/99-custom-fixes"""
         
         if git diff --cached --quiet; then
           echo "ℹ️  没有需要提交的更改"
+          echo "pushed=false" >> $GITHUB_OUTPUT
         else
           git commit -m "chore: sync from upstream and apply modifications
 
@@ -279,6 +281,7 @@ Automated by GitHub Actions"
           
           git push origin main
           echo "✅ 成功推送到远程仓库"
+          echo "pushed=true" >> $GITHUB_OUTPUT
         fi
 
     - name: Summary
@@ -295,10 +298,12 @@ Automated by GitHub Actions"
           echo "✅ 已应用自定义修改"
           echo "✅ 已禁用指定工作流"
           
-          if [ "${{ job.status }}" == "success" ]; then
+          if [ "${{ steps.push_changes.outputs.pushed }}" == "true" ]; then
             echo "✅ 已推送到远程仓库"
+          elif [ "${{ steps.push_changes.outputs.pushed }}" == "false" ]; then
+            echo "ℹ️  没有需要推送的更改"
           else
-            echo "❌ 推送过程遇到错误"
+            echo "⚠️  推送状态未知"
           fi
         else
           echo "ℹ️  上游无更新，未执行任何操作"
