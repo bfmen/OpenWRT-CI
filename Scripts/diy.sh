@@ -419,5 +419,6 @@ fix_openwrt_apk_versions() {
 fix_openwrt_apk_versions package
 
 #fix cmake minimum version issue
-sed -i '/CMAKE_SHARED_LINKER_FLAGS/a CMAKE_OPTIONS += -DCMAKE_POLICY_VERSION_MINIMUM=3.5' include/cmake.mk
-
+if ! grep -q "CMAKE_POLICY_VERSION_MINIMUM" include/cmake.mk; then
+  echo 'CMAKE_OPTIONS += -DCMAKE_POLICY_VERSION_MINIMUM=3.5' >> include/cmake.mk
+fi
