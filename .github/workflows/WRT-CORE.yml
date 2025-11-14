@@ -159,14 +159,6 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-
-      - name: Debug Scripts path
-        run: |
-          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
-          ls -R
-          echo "List Scripts dir (if any):"
-          ls -R "$GITHUB_WORKSPACE/Scripts" || echo "Scripts directory not found"
-
       - name: Custom Packages
         run: |
           cd ./wrt/package/
