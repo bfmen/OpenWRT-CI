@@ -115,48 +115,41 @@ jobs:
         run: |
           find ./ -maxdepth 3 -type f -iregex ".*\(txt\|sh\)$" -exec dos2unix {} \; -exec chmod +x {} \;
 
-#      - name: Check Caches
-#        id: check-cache
-#        if: env.WRT_TEST != 'true'
-#        uses: actions/cache@main
-#        with:
-#          key: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_HASH}}
-#          restore-keys: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}
-#          path: |
-#            ./wrt/.ccache
-#            ./wrt/staging_dir/host*
-#            ./wrt/staging_dir/tool*
-
-#      - name: Update Caches
-#        if: env.WRT_TEST != 'true'
-#        run: |
-#          if [ -d "./wrt/staging_dir" ]; then
-#            find "./wrt/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r DIR; do
-#              find "$DIR" -type f -exec touch {} +
-#            done
-
-#            mkdir -p ./wrt/tmp && echo "1" > ./wrt/tmp/.build
-
- #           echo "toolchain skiped done!"
-#          else
-#            echo "caches missed!"
-#          fi
-
-#          if ${{steps.check-cache.outputs.cache-hit != 'true'}}; then
-#            CACHE_LIST=$(gh cache list --key "$WRT_CONFIG-$WRT_INFO" | cut -f 1)
-#            for CACHE_KEY in $CACHE_LIST; do
-#              gh cache delete $CACHE_KEY
-#           done
-
-#            echo "caches cleanup done!"
-#          fi
-
-      - name: Cache Toolchain(缓存工具链)
-        uses: HiGarfield/cachewrtbuild@main
+      - name: Check Caches
+        id: check-cache
+        if: env.WRT_TEST != 'true'
+        uses: actions/cache@main
         with:
-          ccache: true
-          mixkey: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_HASH}}
-          prefix: "wrt"
+          key: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_HASH}}
+          restore-keys: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}
+          path: |
+            ./wrt/.ccache
+            ./wrt/staging_dir/host*
+            ./wrt/staging_dir/tool*
+
+      - name: Update Caches
+        if: env.WRT_TEST != 'true'
+        run: |
+          if [ -d "./wrt/staging_dir" ]; then
+            find "./wrt/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r DIR; do
+              find "$DIR" -type f -exec touch {} +
+            done
+
+            mkdir -p ./wrt/tmp && echo "1" > ./wrt/tmp/.build
+
+            echo "toolchain skiped done!"
+          else
+            echo "caches missed!"
+          fi
+
+          if ${{steps.check-cache.outputs.cache-hit != 'true'}}; then
+            CACHE_LIST=$(gh cache list --key "$WRT_CONFIG-$WRT_INFO" | cut -f 1)
+            for CACHE_KEY in $CACHE_LIST; do
+              gh cache delete $CACHE_KEY
+           done
+
+            echo "caches cleanup done!"
+          fi
 
 
       - name: Update Feeds
@@ -165,6 +158,14 @@ jobs:
 
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+
+
+      - name: Debug Scripts path
+        run: |
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          ls -R
+          echo "List Scripts dir (if any):"
+          ls -R "$GITHUB_WORKSPACE/Scripts" || echo "Scripts directory not found"
 
       - name: Custom Packages
         run: |
