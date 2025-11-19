@@ -353,7 +353,7 @@ if [ -f "$RUST_FILE" ]; then
 fi
 
 
-# 在 OpenWrt 的 apk 打包规则里统一“洗干净”版本号，
+# 在 OpenWrt 的 apk/ipk 打包规则里统一“洗干净”版本号，
 # 不再改各个 package 目录下的 Makefile，也不需要 PKG_SOURCE_VERSION。
 patch_apk_version_rule() {
   local RULE_FILE
@@ -372,8 +372,8 @@ patch_apk_version_rule() {
   if ! grep -q "APK_SANITIZE_VERSION" "$RULE_FILE"; then
     cat <<'EOF' >>"$RULE_FILE"
 
-# Sanitize version for apk:
-# - 必须以数字开头：前面如果是字母等，就加一个 0.
+# Sanitize version for apk/ipk:
+# - 必须以数字开头：前缀如果是字母等，就加一个 0.
 # - 只允许 0-9 A-Z a-z . _ ：其它全部换成 _
 define APK_SANITIZE_VERSION
 $(shell echo '$(1)' | sed -e 's/^[^0-9]*/0./' -e 's/[^0-9A-Za-z._]/_/g')
@@ -383,15 +383,16 @@ EOF
     echo "[apk-fix] 已追加 APK_SANITIZE_VERSION 定义到 $RULE_FILE" >&2
   fi
 
-  # 3. 把 version:$(PKG_VERSION) 改成 version:$(call APK_SANITIZE_VERSION,$(PKG_VERSION))
-  #   只替换带 version: 的这块，不动其他地方
-  if grep -q 'version:$(PKG_VERSION)' "$RULE_FILE"; then
-    sed -i 's/version:$(PKG_VERSION)/version:$(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$RULE_FILE"
-    echo "[apk-fix] 已在 $RULE_FILE 中启用 APK_SANITIZE_VERSION" >&2
+  # 3. 把文件中所有 $(PKG_VERSION) 改成 $(call APK_SANITIZE_VERSION,$(PKG_VERSION))
+  #   注意：单引号里用 \$(PKG_VERSION) 表示文字，而不是 shell 变量。
+  if grep -q '\$(PKG_VERSION)' "$RULE_FILE"; then
+    sed -i 's/\$(PKG_VERSION)/$(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$RULE_FILE"
+    echo "[apk-fix] 已在 $RULE_FILE 中启用 APK_SANITIZE_VERSION 包装 PKG_VERSION" >&2
   else
-    echo "[apk-fix] 警告：$RULE_FILE 中未找到 \"version:$(PKG_VERSION)\"，请手动确认模板内容。" >&2
+    echo "[apk-fix] 警告：$RULE_FILE 中未找到 \"\$(PKG_VERSION)\"，请手动确认模板内容。" >&2
   fi
 }
+
 
 # 在合适位置调用（比如所有 feeds/包都搞完后、make 之前）：
 patch_apk_version_rule
