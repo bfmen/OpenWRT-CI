@@ -353,43 +353,66 @@ if [ -f "$RUST_FILE" ]; then
 fi
 
 
-# 修复 OpenWrt 包里不合规（非数字开头）的 PKG_VERSION，
+# 修复 OpenWrt 包里不合规（非数字开头或含 rc/beta 等）的 PKG_VERSION，
 # 搜索范围：传入目录（默认 .）向下最多 3 层的所有 Makefile
 fix_openwrt_apk_versions() {
   local ROOT="${1:-.}"
   local MAX_DEPTH="${2:-3}"   # 可选：第二个参数可改最大深度，默认 3
+  local changed=0
 
   log() { printf '[fix-apk] %s\n' "$*" >&2; }
+
+  if [ ! -d "$ROOT" ]; then
+    log "ERROR: 目录不存在: $ROOT"
+    return 1
+  fi
+
+  log "CWD=$(pwd), ROOT=$ROOT, MAX_DEPTH=$MAX_DEPTH"
 
   process_file() {
     local f="$1"
 
     # 读取首个 PKG_VERSION
-    local line ver_raw
+    local line ver_raw new_ver="" ver_num
     line="$(grep -m1 -E '^[[:space:]]*PKG_VERSION:=' "$f" || true)" || true
     [[ -z "$line" ]] && return 0
 
     ver_raw="$(sed -E 's/^[[:space:]]*PKG_VERSION:=[[:space:]]*//; s/[[:space:]]+$//' <<<"$line")"
+    # 去掉可能的引号
     ver_raw="${ver_raw%\"}"; ver_raw="${ver_raw#\"}"
 
-    # 已经是数字开头就无需修复
+    # 决定 new_ver（新的 PKG_VERSION）
     if [[ "$ver_raw" =~ ^[0-9] ]]; then
+      # 数字开头：检查有没有 rc/beta/alpha/pre 这种 pre-release
+      if [[ "$ver_raw" =~ -(rc|beta|alpha|pre) ]]; then
+        # APK 不喜欢多余的 '-'，统一换成 '_'：
+        # 例：29.1.0-rc.1 -> 29.1.0_rc.1
+        new_ver="${ver_raw//-/_}"
+      else
+        # 纯数字/简单版本（1.2.3、1.0.0-r1 等）认为是合法，跳过
+        return 0
+      fi
+    else
+      # 非数字开头：例如 svn1113、v2.4 之类，提取第一个数字序列作为版本
+      ver_num="$(grep -oE '[0-9]+([.][0-9]+)*' <<<"$ver_raw" | head -n1 || true)"
+      if [[ -z "$ver_num" ]]; then
+        log "WARN: $f 的 PKG_VERSION='$ver_raw' 无法提取数字，跳过。"
+        return 0
+      fi
+      new_ver="$ver_num"
+    fi
+
+    # 如果算出来的新版本和原来一样，就没必要动
+    if [[ "$new_ver" == "$ver_raw" ]]; then
       return 0
     fi
 
-    # 提取数字（可含点）的第一段作为包版本
-    local ver_num
-    ver_num="$(grep -oE '[0-9]+([.][0-9]+)*' <<<"$ver_raw" | head -n1 || true)"
-    if [[ -z "$ver_num" ]]; then
-      log "WARN: $f 的 PKG_VERSION='$ver_raw' 无法提取数字，跳过。"
-      return 0
-    fi
-
-    log "修复 $f: PKG_VERSION '$ver_raw' -> '$ver_num'"
+    ((changed++))
+    log "修复 $f: PKG_VERSION '$ver_raw' -> '$new_ver'"
     cp -n "$f" "$f.bak" 2>/dev/null || true
 
-    # 1) 替换首个 PKG_VERSION 为数字版本
-    sed -i -E "0,/^[[:space:]]*PKG_VERSION:=/ s//PKG_VERSION:=${ver_num}/" "$f"
+    # 1) 替换首个 PKG_VERSION 为新版本
+    sed -i -E "0,/^[[:space:]]*PKG_VERSION:=/ s//PKG_VERSION:=${new_ver}/" "$f"
 
     # 2) 若无 PKG_SOURCE_VERSION，则在第一处 PKG_VERSION 行之后插入
     if ! grep -qE '^[[:space:]]*PKG_SOURCE_VERSION:=' "$f"; then
@@ -422,12 +445,16 @@ fix_openwrt_apk_versions() {
     sed -i -E '/^[[:space:]]*PKG_SOURCE_URL:=/ s/\$\((PKG_VERSION)\)/$(PKG_SOURCE_VERSION)/g' "$f"
   }
 
-  # 在 ROOT 下最多 3 层（或自定义 MAX_DEPTH）寻找所有 Makefile
+  # 在 ROOT 下最多 MAX_DEPTH 层寻找所有 Makefile
   while IFS= read -r -d '' mk; do
     process_file "$mk"
   done < <(find "$ROOT" -maxdepth "$MAX_DEPTH" -type f -name Makefile -print0)
 
-  log "扫描与修复完成。"
+  if (( changed == 0 )); then
+    log "扫描完成，未发现需要修复的 PKG_VERSION。"
+  else
+    log "扫描完成，共修复 $changed 个 Makefile。"
+  fi
 }
 
 fix_openwrt_apk_versions package
