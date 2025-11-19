@@ -62,6 +62,7 @@ UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
         taskd luci-lib-xterm luci-lib-taskd luci-app-ssr-plus luci-app-passwall2 \
         luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest \
         luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky luci-app-openclash mihomo \
+		luci-app-dockerman docker-lan-bridge docker dockerd \
         luci-app-nikki frp luci-app-ddns-go ddns-go" "kenzok8/small-package" "main" "pkg"
 
 #speedtest
