@@ -353,111 +353,49 @@ if [ -f "$RUST_FILE" ]; then
 fi
 
 
-# 修复 OpenWrt 包里不合规（非数字开头或含 rc/beta 等）的 PKG_VERSION，
-# 搜索范围：传入目录（默认 .）向下最多 3 层的所有 Makefile
-fix_openwrt_apk_versions() {
-  local ROOT="${1:-.}"
-  local MAX_DEPTH="${2:-3}"   # 可选：第二个参数可改最大深度，默认 3
-  local changed=0
+# 在 OpenWrt 的 apk 打包规则里统一“洗干净”版本号，
+# 不再改各个 package 目录下的 Makefile，也不需要 PKG_SOURCE_VERSION。
+patch_apk_version_rule() {
+  local RULE_FILE
 
-  log() { printf '[fix-apk] %s\n' "$*" >&2; }
+  # 1. 找到包含 "apk mkpkg" 的规则文件（通常在 include/ 下面）
+  RULE_FILE="$(grep -RIl "apk mkpkg" include 2>/dev/null | head -n1 || true)"
 
-  if [ ! -d "$ROOT" ]; then
-    log "ERROR: 目录不存在: $ROOT"
-    return 1
+  if [ -z "$RULE_FILE" ]; then
+    echo "[apk-fix] 没找到 apk mkpkg 规则文件，跳过。" >&2
+    return 0
   fi
 
-  log "CWD=$(pwd), ROOT=$ROOT, MAX_DEPTH=$MAX_DEPTH"
+  echo "[apk-fix] 发现 apk 打包规则文件: $RULE_FILE" >&2
 
-  process_file() {
-    local f="$1"
+  # 2. 如果还没有定义 APK_SANITIZE_VERSION，就追加一个
+  if ! grep -q "APK_SANITIZE_VERSION" "$RULE_FILE"; then
+    cat <<'EOF' >>"$RULE_FILE"
 
-    # 读取首个 PKG_VERSION
-    local line ver_raw new_ver="" ver_num
-    line="$(grep -m1 -E '^[[:space:]]*PKG_VERSION:=' "$f" || true)" || true
-    [[ -z "$line" ]] && return 0
+# Sanitize version for apk:
+# - 必须以数字开头：前面如果是字母等，就加一个 0.
+# - 只允许 0-9 A-Z a-z . _ ：其它全部换成 _
+define APK_SANITIZE_VERSION
+$(shell echo '$(1)' | sed -e 's/^[^0-9]*/0./' -e 's/[^0-9A-Za-z._]/_/g')
+endef
 
-    ver_raw="$(sed -E 's/^[[:space:]]*PKG_VERSION:=[[:space:]]*//; s/[[:space:]]+$//' <<<"$line")"
-    # 去掉可能的引号
-    ver_raw="${ver_raw%\"}"; ver_raw="${ver_raw#\"}"
+EOF
+    echo "[apk-fix] 已追加 APK_SANITIZE_VERSION 定义到 $RULE_FILE" >&2
+  fi
 
-    # 决定 new_ver（新的 PKG_VERSION）
-    if [[ "$ver_raw" =~ ^[0-9] ]]; then
-      # 数字开头：检查有没有 rc/beta/alpha/pre 这种 pre-release
-      if [[ "$ver_raw" =~ -(rc|beta|alpha|pre) ]]; then
-        # APK 不喜欢多余的 '-'，统一换成 '_'：
-        # 例：29.1.0-rc.1 -> 29.1.0_rc.1
-        new_ver="${ver_raw//-/_}"
-      else
-        # 纯数字/简单版本（1.2.3、1.0.0-r1 等）认为是合法，跳过
-        return 0
-      fi
-    else
-      # 非数字开头：例如 svn1113、v2.4 之类，提取第一个数字序列作为版本
-      ver_num="$(grep -oE '[0-9]+([.][0-9]+)*' <<<"$ver_raw" | head -n1 || true)"
-      if [[ -z "$ver_num" ]]; then
-        log "WARN: $f 的 PKG_VERSION='$ver_raw' 无法提取数字，跳过。"
-        return 0
-      fi
-      new_ver="$ver_num"
-    fi
-
-    # 如果算出来的新版本和原来一样，就没必要动
-    if [[ "$new_ver" == "$ver_raw" ]]; then
-      return 0
-    fi
-
-    ((changed++))
-    log "修复 $f: PKG_VERSION '$ver_raw' -> '$new_ver'"
-    cp -n "$f" "$f.bak" 2>/dev/null || true
-
-    # 1) 替换首个 PKG_VERSION 为新版本
-    sed -i -E "0,/^[[:space:]]*PKG_VERSION:=/ s//PKG_VERSION:=${new_ver}/" "$f"
-
-    # 2) 若无 PKG_SOURCE_VERSION，则在第一处 PKG_VERSION 行之后插入
-    if ! grep -qE '^[[:space:]]*PKG_SOURCE_VERSION:=' "$f"; then
-      awk -v raw="$ver_raw" '
-        BEGIN{added=0}
-        {
-          print $0
-          if (!added && $0 ~ /^[[:space:]]*PKG_VERSION:=/) {
-            print "PKG_SOURCE_VERSION:=" raw
-            added=1
-          }
-        }' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-    fi
-
-    # 3) 若无 PKG_BUILD_DIR，则在 PKG_SOURCE_VERSION 后面补一行
-    if ! grep -qE '^[[:space:]]*PKG_BUILD_DIR:=' "$f"; then
-      awk '
-        BEGIN{added=0}
-        {
-          print $0
-          if (!added && $0 ~ /^[[:space:]]*PKG_SOURCE_VERSION:=/) {
-            print "PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_SOURCE_VERSION)"
-            added=1
-          }
-        }' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-    fi
-
-    # 4) 让 PKG_SOURCE / PKG_SOURCE_URL 里的 $(PKG_VERSION) 指向 $(PKG_SOURCE_VERSION)
-    sed -i -E '/^[[:space:]]*PKG_SOURCE:=/ s/\$\((PKG_VERSION)\)/$(PKG_SOURCE_VERSION)/g' "$f"
-    sed -i -E '/^[[:space:]]*PKG_SOURCE_URL:=/ s/\$\((PKG_VERSION)\)/$(PKG_SOURCE_VERSION)/g' "$f"
-  }
-
-  # 在 ROOT 下最多 MAX_DEPTH 层寻找所有 Makefile
-  while IFS= read -r -d '' mk; do
-    process_file "$mk"
-  done < <(find "$ROOT" -maxdepth "$MAX_DEPTH" -type f -name Makefile -print0)
-
-  if (( changed == 0 )); then
-    log "扫描完成，未发现需要修复的 PKG_VERSION。"
+  # 3. 把 version:$(PKG_VERSION) 改成 version:$(call APK_SANITIZE_VERSION,$(PKG_VERSION))
+  #   只替换带 version: 的这块，不动其他地方
+  if grep -q 'version:$(PKG_VERSION)' "$RULE_FILE"; then
+    sed -i 's/version:$(PKG_VERSION)/version:$(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$RULE_FILE"
+    echo "[apk-fix] 已在 $RULE_FILE 中启用 APK_SANITIZE_VERSION" >&2
   else
-    log "扫描完成，共修复 $changed 个 Makefile。"
+    echo "[apk-fix] 警告：$RULE_FILE 中未找到 \"version:$(PKG_VERSION)\"，请手动确认模板内容。" >&2
   fi
 }
 
-fix_openwrt_apk_versions package
+# 在合适位置调用（比如所有 feeds/包都搞完后、make 之前）：
+patch_apk_version_rule
+
 
 #fix cmake minimum version issue
 if ! grep -q "CMAKE_POLICY_VERSION_MINIMUM" include/cmake.mk; then
