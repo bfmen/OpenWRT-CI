@@ -352,51 +352,63 @@ if [ -f "$RUST_FILE" ]; then
 	echo "rust has been fixed!"
 fi
 
+patch_package_mk_version() {
+  # Target file usually found at include/package-ipkg.mk
+  local TARGET_FILE="include/package-ipkg.mk"
 
-# 在 OpenWrt 的 apk/ipk 打包规则里统一“洗干净”版本号，
-# 不再改各个 package 目录下的 Makefile，也不需要 PKG_SOURCE_VERSION。
-patch_apk_version_rule() {
-  local RULE_FILE
-
-  # 1. 找到包含 "apk mkpkg" 的规则文件（通常在 include/ 下面）
-  RULE_FILE="$(grep -RIl "apk mkpkg" include 2>/dev/null | head -n1 || true)"
-
-  if [ -z "$RULE_FILE" ]; then
-    echo "[apk-fix] 没找到 apk mkpkg 规则文件，跳过。" >&2
-    return 0
+  # 1. Verify file existence
+  if [ ! -f "$TARGET_FILE" ]; then
+    echo "[apk-fix] $TARGET_FILE not found. Searching for file defining 'Version:'..."
+    TARGET_FILE="$(grep -l 'Version: $(PKG_VERSION)' include/*.mk | head -n1)"
+    if [ -z "$TARGET_FILE" ]; then
+      echo "[apk-fix] Error: Could not find the mk file defining the package version."
+      return 1
+    fi
   fi
 
-  echo "[apk-fix] 发现 apk 打包规则文件: $RULE_FILE" >&2
+  echo "[apk-fix] Patching file: $TARGET_FILE"
 
-  # 2. 如果还没有定义 APK_SANITIZE_VERSION，就追加一个
-  if ! grep -q "APK_SANITIZE_VERSION" "$RULE_FILE"; then
-    cat <<'EOF' >>"$RULE_FILE"
-
-# Sanitize version for apk/ipk:
-# - 必须以数字开头：前缀如果是字母等，就加一个 0.
-# - 只允许 0-9 A-Z a-z . _ ：其它全部换成 _
+  # 2. Inject APK_SANITIZE_VERSION function definition if not present
+  # Logic:
+  # - Strip leading 'v' or 'V'
+  # - If starts with non-digit, prepend '0.'
+  # - Replace invalid chars with '_'
+  if ! grep -q "define APK_SANITIZE_VERSION" "$TARGET_FILE"; then
+    # Using a temporary file to ensure clean insertion at the top
+    local TEMP_FILE
+    TEMP_FILE=$(mktemp)
+    
+    cat <<'EOF' > "$TEMP_FILE"
+# Sanitize version for apk compatibility
 define APK_SANITIZE_VERSION
-$(shell echo '$(1)' | sed -e 's/^[^0-9]*/0./' -e 's/[^0-9A-Za-z._]/_/g')
+$(shell echo $(1) | sed -e "s/^[vV]//" -e "s/^[^0-9]/0.&/" -e "s/[^0-9A-Za-z._]/_/g")
 endef
 
 EOF
-    echo "[apk-fix] 已追加 APK_SANITIZE_VERSION 定义到 $RULE_FILE" >&2
+    # Append original content to temp file
+    cat "$TARGET_FILE" >> "$TEMP_FILE"
+    # Move back
+    mv "$TEMP_FILE" "$TARGET_FILE"
+    
+    echo "[apk-fix] Injected APK_SANITIZE_VERSION definition."
   fi
 
-  # 3. 把文件中所有 $(PKG_VERSION) 改成 $(call APK_SANITIZE_VERSION,$(PKG_VERSION))
-  #   注意：单引号里用 \$(PKG_VERSION) 表示文字，而不是 shell 变量。
-  if grep -q '\$(PKG_VERSION)' "$RULE_FILE"; then
-    sed -i 's/\$(PKG_VERSION)/$(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$RULE_FILE"
-    echo "[apk-fix] 已在 $RULE_FILE 中启用 APK_SANITIZE_VERSION 包装 PKG_VERSION" >&2
+  # 3. Apply the sanitizer to the Version field
+  # Pattern: Version: $(PKG_VERSION) -> Version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))
+  if grep -q 'Version: \$(PKG_VERSION)' "$TARGET_FILE"; then
+    sed -i 's/Version: \$(PKG_VERSION)/Version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$TARGET_FILE"
+    echo "[apk-fix] Success! Applied version sanitizer rule."
   else
-    echo "[apk-fix] 警告：$RULE_FILE 中未找到 \"\$(PKG_VERSION)\"，请手动确认模板内容。" >&2
+    if grep -q 'APK_SANITIZE_VERSION' "$TARGET_FILE"; then
+      echo "[apk-fix] Notice: Rules seem to be already patched."
+    else
+      echo "[apk-fix] Warning: Could not find standard 'Version: \$(PKG_VERSION)' pattern. Please check manually."
+    fi
   fi
 }
 
-
-# 在合适位置调用（比如所有 feeds/包都搞完后、make 之前）：
-patch_apk_version_rule
-
+# Execute
+patch_package_mk_version
 
 #fix cmake minimum version issue
 if ! grep -q "CMAKE_POLICY_VERSION_MINIMUM" include/cmake.mk; then
