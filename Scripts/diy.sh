@@ -352,63 +352,57 @@ if [ -f "$RUST_FILE" ]; then
 	echo "rust has been fixed!"
 fi
 
-patch_package_mk_version() {
-  # Target file usually found at include/package-ipkg.mk
-  local TARGET_FILE="include/package-ipkg.mk"
 
-  # 1. Verify file existence
-  if [ ! -f "$TARGET_FILE" ]; then
-    echo "[apk-fix] $TARGET_FILE not found. Searching for file defining 'Version:'..."
-    TARGET_FILE="$(grep -l 'Version: $(PKG_VERSION)' include/*.mk | head -n1)"
-    if [ -z "$TARGET_FILE" ]; then
-      echo "[apk-fix] Error: Could not find the mk file defining the package version."
-      return 1
-    fi
-  fi
-
-  echo "[apk-fix] Patching file: $TARGET_FILE"
-
-  # 2. Inject APK_SANITIZE_VERSION function definition if not present
-  # Logic:
-  # - Strip leading 'v' or 'V'
-  # - If starts with non-digit, prepend '0.'
-  # - Replace invalid chars with '_'
-  if ! grep -q "define APK_SANITIZE_VERSION" "$TARGET_FILE"; then
-    # Using a temporary file to ensure clean insertion at the top
-    local TEMP_FILE
-    TEMP_FILE=$(mktemp)
-    
-    cat <<'EOF' > "$TEMP_FILE"
-# Sanitize version for apk compatibility
+# 定义清洗函数：将 v 去掉，将非数字字母的字符转为下划线
+SANITIZE_FUNC='
+# --- Added by apk-fix script ---
 define APK_SANITIZE_VERSION
 $(shell echo $(1) | sed -e "s/^[vV]//" -e "s/^[^0-9]/0.&/" -e "s/[^0-9A-Za-z._]/_/g")
 endef
+# -------------------------------
+'
 
-EOF
-    # Append original content to temp file
-    cat "$TARGET_FILE" >> "$TEMP_FILE"
-    # Move back
-    mv "$TEMP_FILE" "$TARGET_FILE"
-    
-    echo "[apk-fix] Injected APK_SANITIZE_VERSION definition."
+patch_apk_rules() {
+  echo "[apk-fix] 开始搜索 APK 打包规则文件..."
+  
+  # 1. 找到包含 "apk mkpkg" 或 "Version: " 的核心 mk 文件
+  # 通常是 include/package-ipkg.mk 或 include/package-apk.mk
+  FILES=$(grep -l -E "apk mkpkg|Version: \\\$\(PKG_VERSION\)" include/*.mk 2>/dev/null)
+
+  if [ -z "$FILES" ]; then
+    echo "[apk-fix] 错误：没找到任何打包规则文件！"
+    return 1
   fi
 
-  # 3. Apply the sanitizer to the Version field
-  # Pattern: Version: $(PKG_VERSION) -> Version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))
-  if grep -q 'Version: \$(PKG_VERSION)' "$TARGET_FILE"; then
-    sed -i 's/Version: \$(PKG_VERSION)/Version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$TARGET_FILE"
-    echo "[apk-fix] Success! Applied version sanitizer rule."
-  else
-    if grep -q 'APK_SANITIZE_VERSION' "$TARGET_FILE"; then
-      echo "[apk-fix] Notice: Rules seem to be already patched."
-    else
-      echo "[apk-fix] Warning: Could not find standard 'Version: \$(PKG_VERSION)' pattern. Please check manually."
+  for file in $FILES; do
+    echo "[apk-fix] 正在处理: $file"
+
+    # 2. 注入 APK_SANITIZE_VERSION 函数定义 (如果还没注入过)
+    if ! grep -q "define APK_SANITIZE_VERSION" "$file"; then
+      # 创建临时文件，把函数插到文件最开头
+      TEMP=$(mktemp)
+      echo "$SANITIZE_FUNC" > "$TEMP"
+      cat "$file" >> "$TEMP"
+      mv "$TEMP" "$file"
+      echo "[apk-fix] -> 已注入清洗函数定义"
     fi
-  fi
+
+    # 3. 核心修复：替换 Version 字段
+    # 情况 A: 在 Control 文件中写入 Version: ...
+    # 匹配: Version: $(PKG_VERSION)
+    sed -i 's/Version: \$(PKG_VERSION)/Version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
+    
+    # 情况 B: 直接在命令行调用 apk mkpkg --info "version:..."
+    # 匹配: version:$(PKG_VERSION)
+    sed -i 's/version:\$(PKG_VERSION)/version:$(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
+
+    echo "[apk-fix] -> 已应用版本号清洗规则"
+  done
+
+  echo "[apk-fix] 修复完成！"
 }
 
-# Execute
-patch_package_mk_version
+patch_apk_rules
 
 #fix cmake minimum version issue
 if ! grep -q "CMAKE_POLICY_VERSION_MINIMUM" include/cmake.mk; then
