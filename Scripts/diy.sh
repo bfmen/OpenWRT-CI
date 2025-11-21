@@ -352,25 +352,16 @@ if [ -f "$RUST_FILE" ]; then
 	echo "rust has been fixed!"
 fi
 
-
-# 定义清洗函数：将 v 去掉，将非数字字母的字符转为下划线
-SANITIZE_FUNC='
 # --- Added by apk-fix script ---
-define APK_SANITIZE_VERSION
-$(shell echo $(1) | sed -e "s/^[vV]//" -e "s/^[^0-9]/0.&/" -e "s/[^0-9A-Za-z._]/_/g")
-endef
-# -------------------------------
-'
-
-# --- Added by apk-fix script ---
-# 智能清洗函数：
+# 核弹级清洗函数 (Nuclear Option)：
 # 1. 去掉开头的 v/V
-# 2. 保护最后一个横杠 (它是版本和 Release 的分界线，必须保留)
-# 3. 将其他所有非法字符（包括中间的横杠）转为下划线
-# 4. 恢复最后一个横杠
+# 2. 把所有非数字 (0-9) 的字符全部变成点 (.)
+# 3. 把连续的点缩减为一个点
+# 4. 去掉开头和结尾的点
+# 结果：保证版本号里只有数字和点，绝对符合 APK 规范。
 SANITIZE_FUNC='
 define APK_SANITIZE_VERSION
-$(shell echo $(1) | sed -e "s/^[vV]//" -e "s/^[^0-9]/0.&/" -e "s/-\([^-]*\)$$/__HYPHEN__\1/" -e "s/[^0-9A-Za-z._]/_/g" -e "s/__HYPHEN__/-/")
+$(shell echo $(1) | sed -e "s/^[vV]//" -e "s/[^0-9]/./g" -e "s/\.\.*/./g" -e "s/^\.//" -e "s/\.$$//")
 endef
 '
 # -------------------------------
@@ -378,7 +369,7 @@ endef
 patch_apk_rules() {
   echo "[apk-fix] Searching for APK packaging rules..."
   
-  # 搜索核心 mk 文件
+  # 搜索所有相关的 mk 文件
   FILES=$(grep -l "apk mkpkg" include/*.mk 2>/dev/null)
 
   if [ -z "$FILES" ]; then
@@ -393,18 +384,16 @@ patch_apk_rules() {
     echo "[apk-fix] [Before] Matching lines:"
     grep "version:" "$file"
 
-    # 2. 注入函数定义 (如果不存在)
+    # 2. 注入函数定义
     if ! grep -q "define APK_SANITIZE_VERSION" "$file"; then
       TEMP=$(mktemp)
       echo "$SANITIZE_FUNC" > "$TEMP"
       cat "$file" >> "$TEMP"
       mv "$TEMP" "$file"
-      echo "[apk-fix] -> Injected smart sanitizer function"
+      echo "[apk-fix] -> Injected nuclear sanitizer function"
     fi
 
-    # 3. 执行替换 (同时兼容 PKG_VERSION 和 VERSION)
-    # 这里的逻辑是将变量裹上一层清洗函数
-    
+    # 3. 执行替换 (兼容 PKG_VERSION 和 VERSION)
     sed -i 's/version:[[:space:]]*\$(PKG_VERSION)/version:$(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
     sed -i 's/version:[[:space:]]*\$(VERSION)/version:$(call APK_SANITIZE_VERSION,$(VERSION))/g' "$file"
     sed -i 's/Version:[[:space:]]*\$(PKG_VERSION)/Version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
