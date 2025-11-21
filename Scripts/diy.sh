@@ -362,44 +362,61 @@ endef
 # -------------------------------
 '
 
-patch_apk_rules() {
-  echo "[apk-fix] 开始搜索 APK 打包规则文件..."
-  
-  # 1. 找到包含 "apk mkpkg" 或 "Version: " 的核心 mk 文件
-  # 通常是 include/package-ipkg.mk 或 include/package-apk.mk
-  FILES=$(grep -l -E "apk mkpkg|Version: \\\$\(PKG_VERSION\)" include/*.mk 2>/dev/null)
+# 定义清洗函数
+SANITIZE_FUNC='
+# --- Added by apk-fix script ---
+define APK_SANITIZE_VERSION
+$(shell echo $(1) | sed -e "s/^[vV]//" -e "s/^[^0-9]/0.&/" -e "s/[^0-9A-Za-z._]/_/g")
+endef
+# -------------------------------
+'
 
+patch_apk_rules() {
+  echo "[apk-fix] 开始搜索..."
+  
+  # 1. 寻找包含 apk mkpkg 的文件
+  FILES=$(grep -l "apk mkpkg" include/*.mk 2>/dev/null)
+  
   if [ -z "$FILES" ]; then
-    echo "[apk-fix] 错误：没找到任何打包规则文件！"
+    echo "[apk-fix] 错误：找不到 package-pack.mk 或类似文件！"
     return 1
   fi
 
   for file in $FILES; do
-    echo "[apk-fix] 正在处理: $file"
+    echo "[apk-fix] ----------------------------------------"
+    echo "[apk-fix] 发现目标文件: $file"
+    
+    # Debug: 先看看原来的样子（这是关键，看看到底有没有空格）
+    echo "[apk-fix] [修改前] 文件中包含 version: 的行："
+    grep "version:" "$file" || echo "(未找到匹配行，可能使用了变量拼接)"
 
-    # 2. 注入 APK_SANITIZE_VERSION 函数定义 (如果还没注入过)
+    # 2. 注入 APK_SANITIZE_VERSION (如果没注过)
     if ! grep -q "define APK_SANITIZE_VERSION" "$file"; then
-      # 创建临时文件，把函数插到文件最开头
       TEMP=$(mktemp)
       echo "$SANITIZE_FUNC" > "$TEMP"
       cat "$file" >> "$TEMP"
       mv "$TEMP" "$file"
       echo "[apk-fix] -> 已注入清洗函数定义"
+    else
+      echo "[apk-fix] -> 清洗函数已存在，跳过注入"
     fi
 
-    # 3. 核心修复：替换 Version 字段
-    # 情况 A: 在 Control 文件中写入 Version: ...
-    # 匹配: Version: $(PKG_VERSION)
-    sed -i 's/Version: \$(PKG_VERSION)/Version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
+    # 3. 强力修复 (兼容空格)
+    # 使用 [[:space:]]* 匹配任意数量的空格
+    # 目标：将 "version: $(PKG_VERSION)" 替换为 "version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))"
     
-    # 情况 B: 直接在命令行调用 apk mkpkg --info "version:..."
-    # 匹配: version:$(PKG_VERSION)
-    sed -i 's/version:\$(PKG_VERSION)/version:$(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
+    sed -i 's/version:[[:space:]]*\$(PKG_VERSION)/version:$(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
+    
+    # 同时处理大写的 Version: (Control文件)
+    sed -i 's/Version:[[:space:]]*\$(PKG_VERSION)/Version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
 
-    echo "[apk-fix] -> 已应用版本号清洗规则"
+    echo "[apk-fix] -> 已执行 sed 替换命令"
+    
+    # Debug: 看看改完变成了什么样
+    echo "[apk-fix] [修改后] 文件中包含 version: 的行："
+    grep "version:" "$file"
+    echo "[apk-fix] ----------------------------------------"
   done
-
-  echo "[apk-fix] 修复完成！"
 }
 
 patch_apk_rules
