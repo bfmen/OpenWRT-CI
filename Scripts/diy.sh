@@ -353,59 +353,59 @@ if [ -f "$RUST_FILE" ]; then
 fi
 
 # --- Added by apk-fix script ---
-# 核弹级清洗函数 (Nuclear Option)：
-# 1. 去掉开头的 v/V
-# 2. 把所有非数字 (0-9) 的字符全部变成点 (.)
-# 3. 把连续的点缩减为一个点
-# 4. 去掉开头和结尾的点
-# 结果：保证版本号里只有数字和点，绝对符合 APK 规范。
+# V5 智能清洗函数 (AWK 版):
+# 1. 提取版本号末尾的 Release 后缀 (如 -r5, -r12)，将其保护起来。
+# 2. 对剩下的“前缀”部分进行核弹清洗：把所有非数字字符变成点 (.)。
+# 3. 重新拼接。
+# 效果：
+# libc: 1.2.5-r5 -> 1.2.5-r5 (保持不变，完美兼容)
+# libnl: 2025.11.03~532ac-r1 -> 2025.11.03.532..-r1 (合法!)
 SANITIZE_FUNC='
 define APK_SANITIZE_VERSION
-$(shell echo $(1) | sed -e "s/^[vV]//" -e "s/[^0-9]/./g" -e "s/\.\.*/./g" -e "s/^\.//" -e "s/\.$$//")
+$(shell echo $(1) | awk '\''{
+  val=$$0; sub(/^[vV]/, "", val);
+  suffix="";
+  if(match(val, /-r[0-9]+$$/)) {
+    suffix=substr(val, RSTART, RLENGTH);
+    val=substr(val, 1, RSTART-1);
+  }
+  gsub(/[^0-9]/, ".", val);
+  gsub(/\.+/, ".", val);
+  sub(/^\./, "", val); sub(/\.$$/, "", val);
+  print val suffix
+}'\'')
 endef
 '
 # -------------------------------
 
 patch_apk_rules() {
   echo "[apk-fix] Searching for APK packaging rules..."
-  
-  # 搜索所有相关的 mk 文件
   FILES=$(grep -l "apk mkpkg" include/*.mk 2>/dev/null)
 
   if [ -z "$FILES" ]; then
-    echo "[apk-fix] Error: No packaging rules found in include/!"
+    echo "[apk-fix] Error: No packaging rules found!"
     return 1
   fi
 
   for file in $FILES; do
     echo "[apk-fix] Processing file: $file"
     
-    # Debug: 打印修改前
-    echo "[apk-fix] [Before] Matching lines:"
-    grep "version:" "$file"
-
-    # 2. 注入函数定义
+    # 注入函数定义
     if ! grep -q "define APK_SANITIZE_VERSION" "$file"; then
       TEMP=$(mktemp)
       echo "$SANITIZE_FUNC" > "$TEMP"
       cat "$file" >> "$TEMP"
       mv "$TEMP" "$file"
-      echo "[apk-fix] -> Injected nuclear sanitizer function"
+      echo "[apk-fix] -> Injected AWK sanitizer function"
     fi
 
-    # 3. 执行替换 (兼容 PKG_VERSION 和 VERSION)
+    # 执行替换
     sed -i 's/version:[[:space:]]*\$(PKG_VERSION)/version:$(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
     sed -i 's/version:[[:space:]]*\$(VERSION)/version:$(call APK_SANITIZE_VERSION,$(VERSION))/g' "$file"
     sed -i 's/Version:[[:space:]]*\$(PKG_VERSION)/Version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
 
-    echo "[apk-fix] -> Applied sed replacements"
-    
-    # Debug: 打印修改后
-    echo "[apk-fix] [After] Matching lines:"
-    grep "version:" "$file"
-    echo "[apk-fix] ----------------------------------------"
+    echo "[apk-fix] -> Applied replacements"
   done
-
   echo "[apk-fix] Done."
 }
 
