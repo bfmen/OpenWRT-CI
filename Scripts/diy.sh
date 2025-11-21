@@ -362,18 +362,23 @@ endef
 # -------------------------------
 '
 
-SANITIZE_FUNC='
 # --- Added by apk-fix script ---
+# 智能清洗函数：
+# 1. 去掉开头的 v/V
+# 2. 保护最后一个横杠 (它是版本和 Release 的分界线，必须保留)
+# 3. 将其他所有非法字符（包括中间的横杠）转为下划线
+# 4. 恢复最后一个横杠
+SANITIZE_FUNC='
 define APK_SANITIZE_VERSION
-$(shell echo $(1) | sed -e "s/^[vV]//" -e "s/^[^0-9]/0.&/" -e "s/[^0-9A-Za-z._]/_/g")
+$(shell echo $(1) | sed -e "s/^[vV]//" -e "s/^[^0-9]/0.&/" -e "s/-\([^-]*\)$$/__HYPHEN__\1/" -e "s/[^0-9A-Za-z._]/_/g" -e "s/__HYPHEN__/-/")
 endef
-# -------------------------------
 '
+# -------------------------------
 
 patch_apk_rules() {
   echo "[apk-fix] Searching for APK packaging rules..."
   
-  # 1. 扩大搜索范围，确保找到定义 apk mkpkg 的文件
+  # 搜索核心 mk 文件
   FILES=$(grep -l "apk mkpkg" include/*.mk 2>/dev/null)
 
   if [ -z "$FILES" ]; then
@@ -384,33 +389,29 @@ patch_apk_rules() {
   for file in $FILES; do
     echo "[apk-fix] Processing file: $file"
     
-    # Debug: 打印修改前的行
+    # Debug: 打印修改前
     echo "[apk-fix] [Before] Matching lines:"
     grep "version:" "$file"
 
-    # 2. 注入 APK_SANITIZE_VERSION 函数 (如果不存在)
+    # 2. 注入函数定义 (如果不存在)
     if ! grep -q "define APK_SANITIZE_VERSION" "$file"; then
       TEMP=$(mktemp)
       echo "$SANITIZE_FUNC" > "$TEMP"
       cat "$file" >> "$TEMP"
       mv "$TEMP" "$file"
-      echo "[apk-fix] -> Injected sanitizer function definition"
+      echo "[apk-fix] -> Injected smart sanitizer function"
     fi
 
-    # 3. 执行替换 (关键修复：同时匹配 PKG_VERSION 和 VERSION)
+    # 3. 执行替换 (同时兼容 PKG_VERSION 和 VERSION)
+    # 这里的逻辑是将变量裹上一层清洗函数
     
-    # 匹配情况 1: version:$(PKG_VERSION)
     sed -i 's/version:[[:space:]]*\$(PKG_VERSION)/version:$(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
-    
-    # 匹配情况 2: version:$(VERSION)  <-- 这就是你刚才失败的原因，这条规则能修好它
     sed -i 's/version:[[:space:]]*\$(VERSION)/version:$(call APK_SANITIZE_VERSION,$(VERSION))/g' "$file"
-    
-    # 匹配情况 3: Version: $(PKG_VERSION) (Control文件写入)
     sed -i 's/Version:[[:space:]]*\$(PKG_VERSION)/Version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
 
     echo "[apk-fix] -> Applied sed replacements"
     
-    # Debug: 打印修改后的行，必须不一样才算成功
+    # Debug: 打印修改后
     echo "[apk-fix] [After] Matching lines:"
     grep "version:" "$file"
     echo "[apk-fix] ----------------------------------------"
