@@ -352,34 +352,6 @@ if [ -f "$RUST_FILE" ]; then
 	echo "rust has been fixed!"
 fi
 
-# --- Added by apk-fix script ---
-# V6 智能清洗函数 (宽松版):
-# 1. 保护末尾的 -rX (Release) 后缀。
-# 2. 将 ~ (波浪号) 替换为 . (点)。
-# 3. 允许数字、字母和点 (保留 git hash)。
-# 4. 去掉其他非法字符。
-# 效果：
-# libc: 1.2.5-r5 -> 1.2.5-r5 (保持不变)
-# kernel: 6.12.57~b827... -> 6.12.57.b827... (匹配我们将要修改的源码)
-SANITIZE_FUNC='
-define APK_SANITIZE_VERSION
-$(shell echo $(1) | awk '\''{
-  val=$$0; sub(/^[vV]/, "", val);
-  suffix="";
-  if(match(val, /-r[0-9]+$$/)) {
-    suffix=substr(val, RSTART, RLENGTH);
-    val=substr(val, 1, RSTART-1);
-  }
-  gsub(/~/, ".", val);        # 把波浪号变成点
-  gsub(/[^0-9a-zA-Z.]/, ".", val); # 其他非字母数字变成点
-  gsub(/\.+/, ".", val);      # 去掉重复的点
-  sub(/^\./, "", val); sub(/\.$$/, "", val);
-  print val suffix
-}'\'')
-endef
-'
-# -------------------------------
-
 patch_apk_rules() {
   echo "[apk-fix] Searching for APK packaging rules..."
   FILES=$(grep -l "apk mkpkg" include/*.mk 2>/dev/null)
@@ -392,14 +364,36 @@ patch_apk_rules() {
   for file in $FILES; do
     echo "[apk-fix] Processing file: $file"
     
+    # 1. 注入 APK_SANITIZE_VERSION 函数 (使用 'EOF' 防止 Shell 变量污染)
     if ! grep -q "define APK_SANITIZE_VERSION" "$file"; then
       TEMP=$(mktemp)
-      echo "$SANITIZE_FUNC" > "$TEMP"
+      # 关键修正：直接写入，不要存变量
+      cat << 'EOF' > "$TEMP"
+# --- Added by apk-fix script ---
+define APK_SANITIZE_VERSION
+$(shell echo $(1) | awk '{ \
+  val=$$0; sub(/^[vV]/, "", val); \
+  suffix=""; \
+  if(match(val, /-r[0-9]+$$/)) { \
+    suffix=substr(val, RSTART, RLENGTH); \
+    val=substr(val, 1, RSTART-1); \
+  } \
+  gsub(/~/, ".", val); \
+  gsub(/[^0-9a-zA-Z.]/, ".", val); \
+  gsub(/\.+/, ".", val); \
+  sub(/^\./, "", val); sub(/\.$$/, "", val); \
+  print val suffix \
+}')
+endef
+# -------------------------------
+EOF
       cat "$file" >> "$TEMP"
       mv "$TEMP" "$file"
-      echo "[apk-fix] -> Injected V6 sanitizer function"
+      echo "[apk-fix] -> Injected sanitizer function (Safe Mode)"
     fi
 
+    # 2. 执行替换
+    # 将 version: $(PKG_VERSION) 替换为 version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))
     sed -i 's/version:[[:space:]]*\$(PKG_VERSION)/version:$(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
     sed -i 's/version:[[:space:]]*\$(VERSION)/version:$(call APK_SANITIZE_VERSION,$(VERSION))/g' "$file"
     sed -i 's/Version:[[:space:]]*\$(PKG_VERSION)/Version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
