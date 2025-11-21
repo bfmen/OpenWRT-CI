@@ -62,7 +62,7 @@ UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
         taskd luci-lib-xterm luci-lib-taskd luci-app-ssr-plus luci-app-passwall2 \
         luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest \
         luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky luci-app-openclash mihomo \
-		luci-app-dockerman docker-lan-bridge docker dockerd \
+        luci-app-dockerman docker-lan-bridge docker dockerd \
         luci-app-nikki frp luci-app-ddns-go ddns-go" "kenzok8/small-package" "main" "pkg"
 
 #speedtest
@@ -184,11 +184,11 @@ provided_config_lines=(
     #"CONFIG_PACKAGE_luci-app-msd_lite=y"
     "CONFIG_PACKAGE_luci-app-lucky=y"
     "CONFIG_PACKAGE_luci-app-gecoosac=y"
-	"CONFIG_PACKAGE_kmod-wireguard=y"
+    "CONFIG_PACKAGE_kmod-wireguard=y"
     "CONFIG_PACKAGE_wireguard-tools=y"
-	"CONFIG_PACKAGE_luci-proto-wireguard=y"
+    "CONFIG_PACKAGE_luci-proto-wireguard=y"
     "CONFIG_PACKAGE_luci-app-cifs-mount=y"
-	"CONFIG_PACKAGE_kmod-fs-cifs=y"
+    "CONFIG_PACKAGE_kmod-fs-cifs=y"
     "CONFIG_PACKAGE_cifsmount=y"
 )
 
@@ -334,8 +334,8 @@ fi
 
 if [ -f ./package/luci-app-ddns-go/ddns-go/file/ddns-go.init ]; then
     cp ${GITHUB_WORKSPACE}/Scripts/ddns-go.init ./package/luci-app-ddns-go/ddns-go/file/ddns-go.init
-	chmod +x ./package/luci-app-ddns-go/ddns-go/file/ddns-go.init
-	echo "ddns-go.init has been replaced successfully."
+    chmod +x ./package/luci-app-ddns-go/ddns-go/file/ddns-go.init
+    echo "ddns-go.init has been replaced successfully."
 fi
 
 
@@ -344,14 +344,38 @@ fi
 #修复 rust 编译
 RUST_FILE=$(find ./feeds/packages/ -maxdepth 3 -type f -wholename "*/rust/Makefile")
 if [ -f "$RUST_FILE" ]; then
-	echo " "
+    echo " "
 
-	sed -i 's/ci-llvm=true/ci-llvm=false/g' $RUST_FILE
+    sed -i 's/ci-llvm=true/ci-llvm=false/g' $RUST_FILE
     patch $RUST_FILE ${GITHUB_WORKSPACE}/Scripts/rust-makefile.patch
-	
-	echo "rust has been fixed!"
+    
+    echo "rust has been fixed!"
 fi
 
+
+# ============================================================
+#  APK 修复核心逻辑 (Fix APK Dependency Mismatch & Build Errors)
+# ============================================================
+
+# 1. 源码修正：将版本号中的波浪号 ~ 替换为点 .
+#    这是为了防止 APK 生成的包名 (如 6.12.57.b827) 与系统请求的包名 (6.12.57~b827) 不一致
+echo "Fixing source versions (~ -> .)..."
+
+if [ -f package/base-files/Makefile ]; then
+    echo " -> Fixing base-files"
+    sed -i 's/~/./g' package/base-files/Makefile
+fi
+
+echo " -> Fixing Kernel version definitions"
+find include -name "kernel*.mk" -exec sed -i 's/~/./g' {} +
+
+if [ -f package/libs/libnl-tiny/Makefile ]; then
+    echo " -> Fixing libnl-tiny"
+    sed -i 's/~/./g' package/libs/libnl-tiny/Makefile
+fi
+
+# 2. 打包规则修正 (Fix V7 脚本)
+#    注入智能清洗函数，保证生成的 APK 文件名合法 (去掉 v, 处理横杠, 处理波浪号)
 patch_apk_rules() {
   echo "[apk-fix] Searching for APK packaging rules..."
   FILES=$(grep -l "apk mkpkg" include/*.mk 2>/dev/null)
@@ -364,7 +388,7 @@ patch_apk_rules() {
   for file in $FILES; do
     echo "[apk-fix] Processing file: $file"
     
-    # 1. 注入 APK_SANITIZE_VERSION 函数 (使用 'EOF' 防止 Shell 变量污染)
+    # 2.1 注入 APK_SANITIZE_VERSION 函数 (使用 'EOF' 防止 Shell 变量污染)
     if ! grep -q "define APK_SANITIZE_VERSION" "$file"; then
       TEMP=$(mktemp)
       # 关键修正：直接写入，不要存变量
@@ -392,7 +416,7 @@ EOF
       echo "[apk-fix] -> Injected sanitizer function (Safe Mode)"
     fi
 
-    # 2. 执行替换
+    # 2.2 执行替换
     # 将 version: $(PKG_VERSION) 替换为 version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))
     sed -i 's/version:[[:space:]]*\$(PKG_VERSION)/version:$(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
     sed -i 's/version:[[:space:]]*\$(VERSION)/version:$(call APK_SANITIZE_VERSION,$(VERSION))/g' "$file"
