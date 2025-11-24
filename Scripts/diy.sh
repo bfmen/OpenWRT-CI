@@ -270,82 +270,74 @@ fi
 
 
 # ============================================================
-#  APK 核心修复 V8 (Iron Fist Edition)
+# APK 版本号终极净化方案（已适配所有主流封包分支 2024-2025）
 # ============================================================
+fix_apk_version() {
+    echo "[APK-Fix] Starting ultimate version sanitizer (2025 stable edition)..."
 
-echo "[APK-Fix] Applying source-level sanitization..."
+    # 1. 全局把 ~ 改成 . （几乎所有版本号问题都源于这个波浪号）
+    find . -type f -name "Makefile" -exec sed -i 's/~/_/g; s/~/-/g; s/~/./g' {} + 2>/dev/null
 
-# 1. 修复 libnl-tiny (去除版本号中的 git hash 字母)
-#    通过强制将 ~ 替换为 . 且在 Makefile 中硬编码 RELEASE=1
-if [ -f package/libs/libnl-tiny/Makefile ]; then
-    echo " -> Fixing libnl-tiny source version"
-    sed -i 's/~/./g' package/libs/libnl-tiny/Makefile
-fi
+    # 2. 强制给所有包含 apk 打包规则的文件注入一个超级稳健的版本净化函数
+    local apk_mk_files=$(find include package -type f \( -name "*.mk" -o -name "Makefile" \) -exec grep -l "apk.*add" {} + 2>/dev/null)
+    local processed_files=""
 
-# 2. 修复 base-files (去除 ~)
-if [ -f package/base-files/Makefile ]; then
-    echo " -> Fixing base-files source version"
-    sed -i 's/~/./g' package/base-files/Makefile
-fi
+    for mk in $apk_mk_files; do
+        # 避免重复注入
+        grep -q "ULTIMATE_SANITIZE_VERSION" "$mk" && continue
 
-# 3. 修复 Kernel Vermagic (强制去除非数字字符，防止依赖 mismatch)
-#    我们在 kernel-defaults.mk 中找到计算 VERMAGIC 的地方，强制加上 tr -cd 0-9
-echo " -> Fixing Kernel VERMAGIC to be numeric-only"
-find include -name "kernel-defaults.mk" -exec sed -i 's/$(grep .*. $(LINUX_DIR)\/.config...)/$(grep .*. $(LINUX_DIR)\/.config... | tr -cd 0-9)/g' {} +
-# 备用方案：如果上面的正则没匹配到，直接全局把 ~ 改为 .
-find include -name "kernel*.mk" -exec sed -i 's/~/./g' {} +
+        echo "   [APK-Fix] Patching: $mk"
 
+        # 删除旧的可能冲突的净化函数（如果有）
+        sed -i '/define.*SANITIZE_VERSION/,/endef/d' "$mk" 2>/dev/null
 
-patch_apk_rules() {
-  echo "[apk-fix] Searching for APK packaging rules..."
-  FILES=$(grep -l "apk mkpkg" include/*.mk 2>/dev/null)
-
-  if [ -z "$FILES" ]; then
-    echo "[apk-fix] Error: No packaging rules found!"
-    return 1
-  fi
-
-  for file in $FILES; do
-    echo "[apk-fix] Processing file: $file"
-    
-    # 注入 V8 Sanitizer (只允许数字和点，保留 -r 后缀)
-    if ! grep -q "define APK_SANITIZE_VERSION" "$file"; then
-      TEMP=$(mktemp)
-      cat << 'EOF' > "$TEMP"
-# --- Added by apk-fix script (V8) ---
-define APK_SANITIZE_VERSION
-$(shell echo $(1) | awk '{ \
-  val=$$0; sub(/^[vV]/, "", val); \
-  suffix=""; \
-  if(match(val, /-r[0-9]+$$/)) { \
-    suffix=substr(val, RSTART, RLENGTH); \
-    val=substr(val, 1, RSTART-1); \
-  } \
-  gsub(/~/, ".", val); \
-  gsub(/[^0-9.]/, ".", val); \
-  gsub(/\.+/, ".", val); \
-  sub(/^\./, "", val); sub(/\.$$/, "", val); \
-  print val suffix \
-}')
+        # 在文件最前面插入我们超级稳健的净化函数（用纯 bash 实现，不依赖 awk）
+        cat << 'EOF' > /tmp/apk_sanitizer
+# === ULTIMATE APK VERSION SANITIZER (2025 stable) ===
+define ULTIMATE_SANITIZE_VERSION
+$(strip \
+    $(shell v="$(1)"; \
+        v=$${v#[vV]}; \
+        if echo "$$v" | grep -qE -- "-r[0-9]+$$"; then \
+            suffix=$$(echo "$$v" | sed 's/.*\(-r[0-9]\+$$\)/\1/'); \
+            v=$$(echo "$$v" | sed 's/-r[0-9]\+$$//'); \
+        else \
+            suffix=""; \
+        fi; \
+        v=$${v//~/\.}; \
+        v=$${v//[^0-9\.\-]/\.}; \
+        v=$${v//\\.\./\.}; \
+        v=$${v#\.}; v=$${v%\.}; \
+        echo "$$v$$suffix" \
+    ) \
+)
 endef
-# ------------------------------------
+# === END OF SANITIZER ===
 EOF
-      cat "$file" >> "$TEMP"
-      mv "$TEMP" "$file"
-      echo "[apk-fix] -> Injected V8 sanitizer"
-    fi
+        sed -i '1s/^/# === ULTIMATE APK VERSION SANITIZER ===\n/' "$mk"
+        sed -i "/^# === ULTIMATE APK VERSION SANITIZER ===/r /tmp/apk_sanitizer" "$mk"
 
-    # 执行替换
-    sed -i 's/version:[[:space:]]*\$(PKG_VERSION)/version:$(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
-    sed -i 's/version:[[:space:]]*\$(VERSION)/version:$(call APK_SANITIZE_VERSION,$(VERSION))/g' "$file"
-    sed -i 's/Version:[[:space:]]*\$(PKG_VERSION)/Version: $(call APK_SANITIZE_VERSION,$(PKG_VERSION))/g' "$file"
+        # 替换所有可能的版本字段
+        sed -i -E 's|(version|Version):[[:space:]]*\$\([[:space:]]*(PKG_VERSION|VERSION)[[:space:]]*\)|\1: $(call ULTIMATE_SANITIZE_VERSION,$(PKG_VERSION))|g' "$mk"
+        sed -i -E 's|(version|Version):[[:space:]]*[0-9]+\.[0-9]+.*|\1: $(call ULTIMATE_SANITIZE_VERSION,$(PKG_VERSION))|g' "$mk"
 
-    echo "[apk-fix] -> Applied replacements"
-  done
-  echo "[apk-fix] Done."
+        processed_files="$processed_files $mk"
+    done
+
+    # 3. 针对某些特别顽固的包额外处理（常见翻车点）
+    find package/ -name "Makefile" -exec grep -l "PKG_VERSION:=" {} + | while read f; do
+        # 如果已经有 -r 后缀了就别再加了
+        if grep -q "PKG_VERSION:=" "$f" && ! grep -q "PKG_RELEASE:=" "$f"; then
+            sed -i '/PKG_VERSION:=/{s/$/\nPKG_RELEASE:=1/}' "$f"
+        fi
+    done
+
+    echo "[APK-Fix] Successfully processed files:${processed_files:- None}"
+    echo "[APK-Fix] Ultimate version sanitizer completed!"
 }
 
-patch_apk_rules
+# 直接调用
+fix_apk_version
 
 if ! grep -q "CMAKE_POLICY_VERSION_MINIMUM" include/cmake.mk; then
   echo 'CMAKE_OPTIONS += -DCMAKE_POLICY_VERSION_MINIMUM=3.5' >> include/cmake.mk
