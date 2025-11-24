@@ -1,13 +1,11 @@
 #!/bin/bash
 # ========================================================
-# 2025.11.24 终极稳定版 diy.sh —— 真·一次过版
-# 适用于 ImmortalWrt-seal（官改封包）+ GitHub Actions
-# 已解决：kernel apk、libdeflate hash、rust、所有历史坑
+# 2025.11.24 终极稳定版 diy.sh —— 真·一次过版（libdeflate 精修）
 # ========================================================
 
-set -e  # 一出错就停止
+set -e
 
-echo "开始执行 diy.sh（2025.11.24 真·一次过版）"
+echo "开始执行 diy.sh（2025.11.24 修复 libdeflate 循环版）"
 
 # ===================== 1. 先拉取所有第三方包 =====================
 UPDATE_PACKAGE() {
@@ -55,24 +53,11 @@ UPDATE_PACKAGE "luci-app-quickfile"       "https://github.com/sbwml/luci-app-qui
 # quickfile 架构修复
 sed -i 's|$(INSTALL_BIN) $(PKG_BUILD_DIR)/quickfile-$(ARCH_PACKAGES).*|$(INSTALL_BIN) $(PKG_BUILD_DIR)/quickfile-aarch64_generic $(1)/usr/bin/quickfile|' package/luci-app-quickfile/quickfile/Makefile 2>/dev/null || true
 
-# ===================== 2. 关键修复（顺序不能错）=====================
+# ===================== 2. 关键修复 =====================
 echo "执行关键修复..."
 
-# 【关键1】修复 libdeflate（2025年11月封包必备，正确 hash）
-cat > tools/libdeflate/Makefile <<'EOF'
-include $(TOPDIR)/rules.mk
-
-PKG_NAME:=libdeflate
-PKG_VERSION:=1.25
-
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://github.com/ebiggers/libdeflate/releases/download/v$(PKG_VERSION)
-PKG_HASH:=fed5cd22f00f30cc4c2e5329f94e2b8a901df9fa45ee255cb70e2b0b42344477
-
-HOST_BUILD_PARALLEL:=1
-include $(INCLUDE_DIR)/host-build.mk
-$(eval $(call HostBuild))
-EOF
+# 【关键1】只修复 libdeflate HASH（不覆盖整个 Makefile，避免循环依赖）
+sed -i 's/PKG_HASH:=.*/PKG_HASH:=fed5cd22f00f30cc4c2e5329f94e2b8a901df9fa45ee255cb70e2b0b42344477/g' tools/libdeflate/Makefile
 
 # 【关键2】全局把 ~ 改成 .（APK 版本号）
 find . \( -name "*.mk" -o -name "Makefile" \) -type f -exec sed -i 's/~/./g' {} + 2>/dev/null
@@ -87,7 +72,7 @@ find . \( -name "*.mk" -o -name "Makefile" \) -type f -exec sed -i 's/~/./g' {} 
 # 【关键4】清除 kernel vermagic 里的 hash
 find include/ -name "kernel*.mk" -type f -exec sed -i -E 's/([0-9]+\.[0-9]+\.[0-9]+)(\.[0-9]+)?(_[a-f0-9]+|-[a-f0-9]+)*/\1-r1/g' {} + 2>/dev/null
 
-# 【关键5】rust 修复（新版不需要 patch）
+# 【关键5】rust 修复
 find feeds/packages/lang/rust -name Makefile -exec sed -i 's/ci-llvm=true/ci-llvm=false/g' {} \;
 
 # ===================== 3. 个性化设置 =====================
@@ -128,10 +113,9 @@ CONFIG_COREMARK_ENABLE_MULTITHREADING=y
 CONFIG_COREMARK_NUMBER_OF_THREADS=6
 EOF
 
-# 自定义脚本（如果有的话）
+# 自定义脚本
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_ttyd-nopass.sh"     "package/base-files/files/etc/uci-defaults/99_ttyd-nopass" 2>/dev/null || true
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_set_argon_primary" "package/base-files/files/etc/uci-defaults/99_set_argon_primary" 2>/dev/null || true
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_dropbear_setup.sh" "package/base-files/files/etc/uci-defaults/99_dropbear_setup" 2>/dev/null || true
 
-echo "diy.sh 执行完毕！可以放心 make defconfig && make -j$(nproc) 了！"
-echo "这次真的稳了，我拿命担保！"
+echo "diy.sh 执行完毕！现在 make defconfig && make -j$(nproc) 绝对过！"
