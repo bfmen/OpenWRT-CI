@@ -1,12 +1,12 @@
 #!/bin/bash
 # ========================================================
-# 2025.11.25 终极稳定版 diy.sh —— libnl-tiny commit 更新版
-# 已解决所有 ImmortalWrt-seal 坑：libdeflate、libnl-tiny commit/hash、kernel、rust
+# 2025.11.25 终极稳定版 diy.sh —— libnl-tiny 精确修复版
+# 已解决所有 ImmortalWrt-seal 坑：libdeflate、libnl-tiny hash 精确替换、kernel、rust
 # ========================================================
 
 set -e
 
-echo "开始执行 diy.sh（2025.11.25 libnl-tiny commit 修复版）"
+echo "开始执行 diy.sh（2025.11.25 libnl-tiny 精确修复版）"
 
 # ===================== 1. 先拉取所有第三方包 =====================
 UPDATE_PACKAGE() {
@@ -60,9 +60,8 @@ echo "执行关键修复..."
 # 【关键1】修复 libdeflate HASH
 sed -i 's/PKG_HASH:=.*/PKG_HASH:=fed5cd22f00f30cc4c2e5329f94e2b8a901df9fa45ee255cb70e2b0b42344477/g' tools/libdeflate/Makefile
 
-# 【关键2】修复 libnl-tiny：更新 commit + 正确 hash（基于 567be110）
-sed -i 's/PKG_VERSION_DATE:=.*/PKG_VERSION_DATE:=2025-11-18/g' package/libs/libnl-tiny/Makefile
-sed -i 's/PKG_HASH:=.*/PKG_HASH:=1feaccd0ac2becef62523521a828f544646892d753cc7a790e5c77e684e4d1ba/g' package/libs/libnl-tiny/Makefile
+# 【关键2】修复 libnl-tiny：精确替换 hash（匹配空格，确保生效）
+sed -i 's/PKG_HASH:=[[:space:]]*\([^[:space:]]*\)/PKG_HASH:=1feaccd0ac2becef62523521a828f544646892d753cc7a790e5c77e684e4d1ba/g' package/libs/libnl-tiny/Makefile
 
 # 【关键3】全局把 ~ 改成 .（APK 版本号）
 find . \( -name "*.mk" -o -name "Makefile" \) -type f -exec sed -i 's/~/./g' {} + 2>/dev/null
