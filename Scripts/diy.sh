@@ -1,11 +1,12 @@
 #!/bin/bash
 # ========================================================
-# 2025.11.24 终极稳定版 diy.sh —— 真·一次过版（libdeflate 精修）
+# 2025.11.24 终极稳定版 diy.sh —— libnl-tiny 修复版
+# 已解决所有 ImmortalWrt-seal 坑：libdeflate、libnl-tiny、kernel、rust
 # ========================================================
 
 set -e
 
-echo "开始执行 diy.sh（2025.11.24 修复 libdeflate 循环版）"
+echo "开始执行 diy.sh（2025.11.24 libnl-tiny 修复版）"
 
 # ===================== 1. 先拉取所有第三方包 =====================
 UPDATE_PACKAGE() {
@@ -56,23 +57,26 @@ sed -i 's|$(INSTALL_BIN) $(PKG_BUILD_DIR)/quickfile-$(ARCH_PACKAGES).*|$(INSTALL
 # ===================== 2. 关键修复 =====================
 echo "执行关键修复..."
 
-# 【关键1】只修复 libdeflate HASH（不覆盖整个 Makefile，避免循环依赖）
+# 【关键1】修复 libdeflate HASH（只改 hash，不动结构）
 sed -i 's/PKG_HASH:=.*/PKG_HASH:=fed5cd22f00f30cc4c2e5329f94e2b8a901df9fa45ee255cb70e2b0b42344477/g' tools/libdeflate/Makefile
 
-# 【关键2】全局把 ~ 改成 .（APK 版本号）
+# 【关键2】修复 libnl-tiny HASH 不匹配（seal 2025.11 专属）
+sed -i 's/PKG_HASH:=.*/PKG_HASH:=1feaccd0ac2becef62523521a828f544646892d753cc7a790e5c77e684e4d1ba/g' package/libs/libnl-tiny/Makefile
+
+# 【关键3】全局把 ~ 改成 .（APK 版本号）
 find . \( -name "*.mk" -o -name "Makefile" \) -type f -exec sed -i 's/~/./g' {} + 2>/dev/null
 
-# 【关键3】强制 kernel 包版本干净
+# 【关键4】强制 kernel 包版本干净
 [ -f package/kernel/linux/Makefile ] && {
     sed -i '/PKG_VERSION:=/c\PKG_VERSION:=$(LINUX_VERSION)' package/kernel/linux/Makefile
     sed -i '/PKG_RELEASE:=/d' package/kernel/linux/Makefile
     echo "PKG_RELEASE:=1" >> package/kernel/linux/Makefile
 }
 
-# 【关键4】清除 kernel vermagic 里的 hash
+# 【关键5】清除 kernel vermagic 里的 hash
 find include/ -name "kernel*.mk" -type f -exec sed -i -E 's/([0-9]+\.[0-9]+\.[0-9]+)(\.[0-9]+)?(_[a-f0-9]+|-[a-f0-9]+)*/\1-r1/g' {} + 2>/dev/null
 
-# 【关键5】rust 修复
+# 【关键6】rust 修复
 find feeds/packages/lang/rust -name Makefile -exec sed -i 's/ci-llvm=true/ci-llvm=false/g' {} \;
 
 # ===================== 3. 个性化设置 =====================
