@@ -1,12 +1,12 @@
 #!/bin/bash
 # ========================================================
-# 2025.11.26 终极稳定版 diy.sh —— libnl-tiny 精确去空格版
-# 已解决所有 ImmortalWrt-seal 坑：libdeflate、libnl-tiny skip（去空格）、kernel、rust
+# 2025.11.26 终极稳定版 diy.sh —— libnl-tiny 暴力替换版
+# 已解决所有 ImmortalWrt-seal 坑：libdeflate、libnl-tiny skip（删旧加新）、kernel、rust
 # ========================================================
 
 set -e
 
-echo "开始执行 diy.sh（2025.11.26 libnl-tiny 去空格版）"
+echo "开始执行 diy.sh（2025.11.26 libnl-tiny 暴力版）"
 
 # ===================== 1. 先拉取所有第三方包 =====================
 UPDATE_PACKAGE() {
@@ -60,9 +60,10 @@ echo "执行关键修复..."
 # 【关键1】修复 libdeflate HASH
 sed -i 's/PKG_HASH:=.*/PKG_HASH:=fed5cd22f00f30cc4c2e5329f94e2b8a901df9fa45ee255cb70e2b0b42344477/g' tools/libdeflate/Makefile
 
-# 【关键2】精确去空格 + 强制 libnl-tiny PKG_HASH 为 skip（终极版）
-sed -i 's/PKG_HASH[[:space:]]*:=.*/PKG_HASH:=skip/g' package/libs/libnl-tiny/Makefile
-echo "libnl-tiny PKG_HASH 已强制设为 skip：$(grep PKG_HASH package/libs/libnl-tiny/Makefile)"
+# 【关键2】暴力替换 libnl-tiny PKG_HASH：删旧行 + 加 skip（最稳）
+sed -i '/PKG_HASH:/d' package/libs/libnl-tiny/Makefile
+echo "PKG_HASH:=skip" >> package/libs/libnl-tiny/Makefile
+cat package/libs/libnl-tiny/Makefile | grep PKG_HASH -A1 -B1  # 打印上下文验证
 
 # 【关键3】全局把 ~ 改成 .（APK 版本号）
 find . \( -name "*.mk" -o -name "Makefile" \) -type f -exec sed -i 's/~/./g' {} + 2>/dev/null
