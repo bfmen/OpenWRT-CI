@@ -148,7 +148,7 @@ find ./ -name "cascade.css" -exec sed -i 's/#5e72e4/#31A1A1/g; s/#483d8b/#31A1A1
 find ./ -name "dark.css"    -exec sed -i 's/#5e72e4/#31A1A1/g; s/#483d8b/#31A1A1/g' {} \;
 
 # 写入必选插件（保留）
-cat >> .config <<EOF
+cat >> .config <<'EOF'
 CONFIG_PACKAGE_luci-app-zerotier=y
 CONFIG_PACKAGE_luci-app-adguardhome=y
 CONFIG_PACKAGE_luci-app-poweroff=y
@@ -161,5 +161,30 @@ CONFIG_PACKAGE_luci-app-tailscale=y
 CONFIG_PACKAGE_luci-app-lucky=y
 CONFIG_PACKAGE_luci-app-gecoosac=y
 CONFIG_PACKAGE_luci-app-openclash=y
-CONFIG_PACKAGE_luci-app-dockerman=y
-CONFIG_PACKAGE_luci-ap
+CONFIG_PACKAGE-luci-app-dockerman=y
+CONFIG_PACKAGE_luci-app-openlist2=y
+CONFIG_PACKAGE_luci-app-passwall=y
+CONFIG_PACKAGE_luci-app-frpc=y
+CONFIG_PACKAGE_luci-app-samba4=y
+CONFIG_PACKAGE_openssh-sftp-server=y
+CONFIG_PACKAGE_luci-app-filetransfer=y
+CONFIG_PACKAGE_nano=y
+CONFIG_PACKAGE_htop=y
+CONFIG_PACKAGE_coremark=y
+CONFIG_COREMARK_OPTIMIZE_O3=y
+CONFIG_COREMARK_ENABLE_MULTITHREADING=y
+CONFIG_COREMARK_NUMBER_OF_THREADS=6
+EOF
+
+# 自定义脚本（保留）
+install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_ttyd-nopass.sh" \
+    "package/base-files/files/etc/uci-defaults/99_ttyd-nopass" 2>/dev/null || true
+
+install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_set_argon_primary" \
+    "package/base-files/files/etc/uci-defaults/99_set_argon_primary" 2>/dev/null || true
+
+install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_dropbear_setup.sh" \
+    "package/base-files/files/etc/uci-defaults/99_dropbear_setup" 2>/dev/null || true
+
+echo "diy.sh 执行完毕！"
+
