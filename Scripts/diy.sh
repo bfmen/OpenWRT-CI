@@ -74,27 +74,39 @@ for f in package/libs/libnl-tiny/Makefile feeds/base/libs/libnl-tiny/Makefile; d
     grep -n 'PKG_.*HASH' "$f" || true
 done
 
-# 【关键2.2】libnl-tiny APK 版本号修复：从日期生成合法版本，去掉 git hash
-# 原来 apk 报错：
-#   version:2025.11.03.532ac744-r1 → package version is invalid
-# 这里改成：2025.11.03.1-r1 这种纯数字段
+# 【关键2.2】libnl-tiny APK 版本号修复：用日期生成干净版本 + 清空 DATE / VERSION，避免重复拼接
 if [ -f package/libs/libnl-tiny/Makefile ]; then
     LIBNL_MK=package/libs/libnl-tiny/Makefile
-    # 取 PKG_SOURCE_DATE，例如 2025-11-03
+
+    # 1. 先抓 PKG_SOURCE_DATE（例如 2025-11-03），如果没有就直接跳过
     LIBNL_DATE=$(grep -m1 '^PKG_SOURCE_DATE:=' "$LIBNL_MK" | cut -d= -f2 | tr -d '[:space:]')
     if [ -n "$LIBNL_DATE" ]; then
         # 转成 2025.11.03
         LIBNL_VER_DATE=${LIBNL_DATE//-/.}
-        # 防止重复执行，先删掉已有 PKG_VERSION 行
+
+        echo "[libnl-tiny] APK 版本修复：DATE=${LIBNL_DATE} → VERSION=${LIBNL_VER_DATE}.1"
+
+        # 2. 删除原来的 PKG_VERSION，避免跟新值拼在一起
         sed -i '/^PKG_VERSION:=/d' "$LIBNL_MK"
-        # 在第一条 PKG_SOURCE_DATE 后面插入一个新的 PKG_VERSION 行
-        sed -i "0,/^PKG_SOURCE_DATE:=/s//PKG_SOURCE_DATE:=${LIBNL_DATE}\nPKG_VERSION:=${LIBNL_VER_DATE}.1/" "$LIBNL_MK"
-        echo "[libnl-tiny] APK 版本修复完成："
-        grep -n 'PKG_SOURCE_DATE\|PKG_VERSION' "$LIBNL_MK" || true
+
+        # 3. 清空 PKG_SOURCE_DATE / PKG_SOURCE_VERSION，
+        #    防止 apk 后端再把它们拼到版本号里变成 xxx2025-11-03 这种怪物
+        sed -i 's/^PKG_SOURCE_DATE:=.*/PKG_SOURCE_DATE:=/g' "$LIBNL_MK"
+        sed -i 's/^PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=/g' "$LIBNL_MK"
+
+        # 4. 在文件末尾追加一个“干净”的 PKG_VERSION / PKG_RELEASE，覆盖原逻辑
+        {
+            echo "PKG_VERSION:=${LIBNL_VER_DATE}.1"
+            echo "PKG_RELEASE:=1"
+        } >> "$LIBNL_MK"
+
+        echo "[libnl-tiny] 最终版本字段："
+        grep -n 'PKG_SOURCE_DATE\|PKG_SOURCE_VERSION\|PKG_VERSION\|PKG_RELEASE' "$LIBNL_MK" || true
     else
         echo "[libnl-tiny] 警告：未找到 PKG_SOURCE_DATE，APK 版本未修复" >&2
     fi
 fi
+
 
 # 【关键3】全局把 ~ 改成 .（APK 版本号）
 find . \( -name "*.mk" -o -name "Makefile" \) -type f -exec sed -i 's/~/./g' {} + 2>/dev/null
