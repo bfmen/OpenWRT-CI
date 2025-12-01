@@ -116,9 +116,6 @@ EOF
 echo "libnl-tiny Makefile 已重置为官方版本（URL 已修正）"
 
 
-# 全局版本号修复（你原有逻辑）
-find . \( -name "*.mk" -o -name "Makefile" \) -type f -exec sed -i 's/~/./g' {} + 2>/dev/null
-
 
 # kernel 修复
 [ -f package/kernel/linux/Makefile ] && {
