@@ -60,6 +60,8 @@ sed -i 's|$(INSTALL_BIN) $(PKG_BUILD_DIR)/quickfile-$(ARCH_PACKAGES).*|$(INSTALL
 # ===================== 2. 关键修复 =====================
 echo "执行关键修复..."
 
+find package/ -name Makefile -type f -exec sed -i 's/PKG_MIRROR_HASH:=/#PKG_MIRROR_HASH:=/g' {} \;
+
 # libdeflate
 sed -i 's/PKG_HASH:=.*/PKG_HASH:=fed5cd22f00f30cc4c2e5329f94e2b8a901df9fa45ee255cb70e2b0b42344477/g' tools/libdeflate/Makefile
 
