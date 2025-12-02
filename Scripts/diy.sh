@@ -1,11 +1,13 @@
 #!/bin/bash
 # ========================================================
-# 2025.11.26 终极稳定版 diy.sh —— libnl-tiny 暴力修复 + 原功能完整保留
+# 2025.12.02 终极修复版 diy.sh
+# 1. 修复 libnl-tiny 缺失 InstallDev 导致 ucode 编译失败的问题
+# 2. 修复全局版本号替换导致 apk 打包报错的问题
 # ========================================================
 
 set -e
 
-echo "开始执行 diy.sh（2025.11.26 libnl-tiny 修复版）"
+echo "开始执行 diy.sh（2025.12.02 完整修复版）"
 
 # ===================== 1. 拉取第三方包函数 =====================
 UPDATE_PACKAGE() {
@@ -44,9 +46,9 @@ UPDATE_PACKAGE() {
 
 echo "正在拉取第三方包..."
 UPDATE_PACKAGE "luci-app-poweroff"        "esirplayground/luci-app-poweroff" "main"
-UPDATE_PACKAGE "luci-app-tailscale"       "asvow/luci-app-tailscale"        "main"
-UPDATE_PACKAGE "openwrt-gecoosac"         "lwb1978/openwrt-gecoosac"        "main"
-UPDATE_PACKAGE "luci-app-openlist2"       "sbwml/luci-app-openlist2"        "main"
+UPDATE_PACKAGE "luci-app-tailscale"       "asvow/luci-app-tailscale"         "main"
+UPDATE_PACKAGE "openwrt-gecoosac"         "lwb1978/openwrt-gecoosac"         "main"
+UPDATE_PACKAGE "luci-app-openlist2"       "sbwml/luci-app-openlist2"         "main"
 UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria naiveproxy v2ray-core v2ray-geodata v2ray-geoview v2ray-plugin tuic-client chinadns-ng ipt2socks tcping trojan-plus simple-obfs shadowsocksr-libev luci-app-passwall smartdns luci-app-smartdns v2dat mosdns luci-app-mosdns taskd luci-lib-xterm luci-lib-taskd luci-app-ssr-plus luci-app-passwall2 luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky luci-app-openclash mihomo luci-app-dockerman docker-lan-bridge docker dockerd luci-app-nikki frp luci-app-ddns-go ddns-go" "kenzok8/small-package" "main" "pkg"
 UPDATE_PACKAGE "luci-app-netspeedtest speedtest-cli" "https://github.com/sbwml/openwrt_pkgs.git" "main" "pkg"
 UPDATE_PACKAGE "luci-app-adguardhome"     "https://github.com/ysuolmai/luci-app-adguardhome.git" "apk"
@@ -66,8 +68,8 @@ find package/ -name Makefile -type f -exec sed -i 's/PKG_MIRROR_HASH:=/#PKG_MIRR
 sed -i 's/PKG_HASH:=.*/PKG_HASH:=fed5cd22f00f30cc4c2e5329f94e2b8a901df9fa45ee255cb70e2b0b42344477/g' tools/libdeflate/Makefile
 
 
-# ===================== ★★★ libnl-tiny 官方版覆盖 + 正确 URL ★★★ =====================
-echo "覆盖 package/libs/libnl-tiny/Makefile 为 OpenWrt 24.10 官方版本..."
+# ===================== ★★★ libnl-tiny 完美修复版 ★★★ =====================
+echo "覆盖 package/libs/libnl-tiny/Makefile 为 OpenWrt 24.10 官方版本（含 InstallDev）..."
 
 cat > package/libs/libnl-tiny/Makefile << 'EOF'
 include $(TOPDIR)/rules.mk
@@ -105,6 +107,14 @@ define Build/Compile
 		LDFLAGS="$(TARGET_LDFLAGS)"
 endef
 
+# 关键修复：添加 Build/InstallDev，让 ucode 等依赖包能找到头文件
+define Build/InstallDev
+	$(INSTALL_DIR) $(1)/usr/lib/pkgconfig $(1)/usr/include/libnl-tiny
+	$(CP) $(PKG_BUILD_DIR)/include/* $(1)/usr/include/libnl-tiny
+	$(CP) $(PKG_BUILD_DIR)/libnl-tiny.so* $(1)/usr/lib/
+	$(CP) $(PKG_BUILD_DIR)/libnl-tiny.pc $(1)/usr/lib/pkgconfig/
+endef
+
 define Package/libnl-tiny/install
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(CP) $(PKG_BUILD_DIR)/libnl-tiny.so* $(1)/usr/lib/
@@ -113,20 +123,23 @@ endef
 $(eval $(call BuildPackage,libnl-tiny))
 EOF
 
-echo "libnl-tiny Makefile 已重置为官方版本（URL 已修正）"
+echo "libnl-tiny Makefile 已重置（包含 InstallDev）"
 
 
+# ===================== 版本号安全修复 =====================
+# 1. 移除全局替换（防止 apk 报错），仅对 include 目录下的 kernel mk 文件进行替换
+find include/ -name "kernel*.mk" -type f -exec sed -i 's/~/./g' {} + 2>/dev/null
 
-# kernel 修复
+# 2. Kernel 版本号规范化修复
+find include/ -name "kernel*.mk" -type f -exec sed -i -E \
+    's/([0-9]+\.[0-9]+\.[0-9]+)(\.[0-9]+)?(_[a-f0-9]+|-[a-f0-9]+)*/\1-r1/g' {} +
+
+# 3. Kernel 包版本定义修复
 [ -f package/kernel/linux/Makefile ] && {
     sed -i '/PKG_VERSION:=/c\PKG_VERSION:=$(LINUX_VERSION)' package/kernel/linux/Makefile
     sed -i '/PKG_RELEASE:=/d' package/kernel/linux/Makefile
     echo "PKG_RELEASE:=1" >> package/kernel/linux/Makefile
 }
-
-find include/ -name "kernel*.mk" -type f -exec sed -i -E \
-    's/([0-9]+\.[0-9]+\.[0-9]+)(\.[0-9]+)?(_[a-f0-9]+|-[a-f0-9]+)*/\1-r1/g' {} +
-
 
 # rust 修复
 find feeds/packages/lang/rust -name Makefile -exec sed -i 's/ci-llvm=true/ci-llvm=false/g' {} \;
@@ -172,7 +185,7 @@ CONFIG_COREMARK_ENABLE_MULTITHREADING=y
 CONFIG_COREMARK_NUMBER_OF_THREADS=6
 EOF
 
-install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_ttyd-nopass.sh"     \
+install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_ttyd-nopass.sh"      \
     "package/base-files/files/etc/uci-defaults/99_ttyd-nopass" 2>/dev/null || true
 
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_set_argon_primary" \
