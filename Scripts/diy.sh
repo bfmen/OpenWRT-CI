@@ -1,24 +1,25 @@
 #!/bin/bash
 # ========================================================
-# 2025.12.02 终极修复版 diy.sh
-# 1. 修复 libnl-tiny 缺失 InstallDev 导致 ucode 编译失败的问题
-# 2. 修复全局版本号替换导致 apk 打包报错的问题
+# 2025.12.03 终极整合版 diy.sh
+# 适配 WRT-CORE.yml 流程
 # ========================================================
 
 set -e
 
-echo "开始执行 diy.sh（2025.12.02 完整修复版）"
+echo "开始执行 diy.sh..."
 
-# ===================== 1. 拉取第三方包函数 =====================
+# ===================== 1. 定义拉取函数 =====================
 UPDATE_PACKAGE() {
     local PKG_NAME="$1" PKG_REPO="$2" PKG_BRANCH="$3" PKG_SPECIAL="$4"
     read -ra NAMES <<< "$PKG_NAME"
 
+    # 清理旧包，防止冲突
     for NAME in "${NAMES[@]}"; do
         find feeds/luci/ feeds/packages/ package/ -maxdepth 3 -type d \
             \( -name "$NAME" -o -name "luci-*-$NAME" \) -exec rm -rf {} + 2>/dev/null || true
     done
 
+    # 识别仓库地址
     if [[ $PKG_REPO == http* ]]; then
         REPO_NAME=$(basename "$PKG_REPO" .git)
     else
@@ -26,8 +27,10 @@ UPDATE_PACKAGE() {
         PKG_REPO="https://github.com/$PKG_REPO.git"
     fi
 
+    # 克隆仓库
     git clone --depth=1 --branch "$PKG_BRANCH" "$PKG_REPO" "package/$REPO_NAME" || exit 1
 
+    # 处理特殊包结构
     case "$PKG_SPECIAL" in
         "pkg")
             for NAME in "${NAMES[@]}"; do
@@ -44,32 +47,31 @@ UPDATE_PACKAGE() {
     esac
 }
 
+# ===================== 2. 拉取第三方插件 =====================
 echo "正在拉取第三方包..."
+
+# 基础插件
 UPDATE_PACKAGE "luci-app-poweroff"        "esirplayground/luci-app-poweroff" "main"
 UPDATE_PACKAGE "luci-app-tailscale"       "asvow/luci-app-tailscale"         "main"
 UPDATE_PACKAGE "openwrt-gecoosac"         "lwb1978/openwrt-gecoosac"         "main"
 UPDATE_PACKAGE "luci-app-openlist2"       "sbwml/luci-app-openlist2"         "main"
-UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria naiveproxy v2ray-core v2ray-geodata v2ray-geoview v2ray-plugin tuic-client chinadns-ng ipt2socks tcping trojan-plus simple-obfs shadowsocksr-libev luci-app-passwall smartdns luci-app-smartdns v2dat mosdns luci-app-mosdns taskd luci-lib-xterm luci-lib-taskd luci-app-ssr-plus luci-app-passwall2 luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky luci-app-openclash mihomo luci-app-dockerman docker-lan-bridge docker dockerd luci-app-nikki frp luci-app-ddns-go ddns-go" "kenzok8/small-package" "main" "pkg"
-UPDATE_PACKAGE "luci-app-netspeedtest speedtest-cli" "https://github.com/sbwml/openwrt_pkgs.git" "main" "pkg"
-UPDATE_PACKAGE "luci-app-adguardhome"     "https://github.com/ysuolmai/luci-app-adguardhome.git" "apk"
-UPDATE_PACKAGE "openwrt-podman"           "https://github.com/breeze303/openwrt-podman" "main"
-UPDATE_PACKAGE "luci-app-quickfile"       "https://github.com/sbwml/luci-app-quickfile" "main"
+UPDATE_PACKAGE "luci-app-quickfile"       "sbwml/luci-app-quickfile"         "main"
 
-# quickfile 修复
+# 科学与工具 (Kenzok8)
+UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria naiveproxy v2ray-core v2ray-geodata v2ray-geoview v2ray-plugin tuic-client chinadns-ng ipt2socks tcping trojan-plus simple-obfs shadowsocksr-libev luci-app-passwall smartdns luci-app-smartdns v2dat mosdns luci-app-mosdns taskd luci-lib-xterm luci-lib-taskd luci-app-ssr-plus luci-app-passwall2 luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky luci-app-openclash mihomo luci-app-dockerman docker-lan-bridge docker dockerd luci-app-nikki frp luci-app-ddns-go ddns-go" "kenzok8/small-package" "main" "pkg"
+
+# 修复 quickfile 编译路径
 sed -i 's|$(INSTALL_BIN) $(PKG_BUILD_DIR)/quickfile-$(ARCH_PACKAGES).*|$(INSTALL_BIN) $(PKG_BUILD_DIR)/quickfile-aarch64_generic $(1)/usr/bin/quickfile|' package/luci-app-quickfile/quickfile/Makefile 2>/dev/null || true
 
+# ===================== 3. 核心编译修复 (Build Fixes) =====================
 
-# ===================== 2. 关键修复 =====================
-echo "执行关键修复..."
-
+# --- 修复 1: 镜像源哈希验证 ---
 find package/ -name Makefile -type f -exec sed -i 's/PKG_MIRROR_HASH:=/#PKG_MIRROR_HASH:=/g' {} \;
-
-# libdeflate
 sed -i 's/PKG_HASH:=.*/PKG_HASH:=fed5cd22f00f30cc4c2e5329f94e2b8a901df9fa45ee255cb70e2b0b42344477/g' tools/libdeflate/Makefile
 
-
-# ===================== ★★★ libnl-tiny 完美修复版 ★★★ =====================
-echo "覆盖 package/libs/libnl-tiny/Makefile 为 OpenWrt 24.10 官方版本（含 InstallDev）..."
+# --- 修复 2: libnl-tiny (必须包含 InstallDev) ---
+echo "正在修复 libnl-tiny..."
+mkdir -p package/libs/libnl-tiny
 
 cat > package/libs/libnl-tiny/Makefile << 'EOF'
 include $(TOPDIR)/rules.mk
@@ -107,7 +109,7 @@ define Build/Compile
 		LDFLAGS="$(TARGET_LDFLAGS)"
 endef
 
-# 关键修复：添加 Build/InstallDev，让 ucode 等依赖包能找到头文件
+# 关键: 让 ucode 能找到头文件
 define Build/InstallDev
 	$(INSTALL_DIR) $(1)/usr/lib/pkgconfig $(1)/usr/include/libnl-tiny
 	$(CP) $(PKG_BUILD_DIR)/include/* $(1)/usr/include/libnl-tiny
@@ -123,40 +125,31 @@ endef
 $(eval $(call BuildPackage,libnl-tiny))
 EOF
 
-echo "libnl-tiny Makefile 已重置（包含 InstallDev）"
-
-
-# ===================== 版本号安全修复 =====================
-# 1. 移除全局替换（防止 apk 报错），仅对 include 目录下的 kernel mk 文件进行替换
+# --- 修复 3: 防止 apk 版本号报错 (只修 Kernel) ---
 find include/ -name "kernel*.mk" -type f -exec sed -i 's/~/./g' {} + 2>/dev/null
-
-# 2. Kernel 版本号规范化修复
 find include/ -name "kernel*.mk" -type f -exec sed -i -E \
     's/([0-9]+\.[0-9]+\.[0-9]+)(\.[0-9]+)?(_[a-f0-9]+|-[a-f0-9]+)*/\1-r1/g' {} +
 
-# 3. Kernel 包版本定义修复
-[ -f package/kernel/linux/Makefile ] && {
-    sed -i '/PKG_VERSION:=/c\PKG_VERSION:=$(LINUX_VERSION)' package/kernel/linux/Makefile
-    sed -i '/PKG_RELEASE:=/d' package/kernel/linux/Makefile
-    echo "PKG_RELEASE:=1" >> package/kernel/linux/Makefile
-}
-
-# rust 修复
+# 修复 Rust 编译
 find feeds/packages/lang/rust -name Makefile -exec sed -i 's/ci-llvm=true/ci-llvm=false/g' {} \;
 
 
-# ===================== 3. 个性化设置 =====================
-echo "写入个性化设置..."
+# ===================== 4. 个性化设置 (Settings) =====================
+echo "正在应用个性化设置..."
 
+# 修改默认 IP (192.168.1.1)
 sed -i "s/192\.168\.[0-9]*\.[0-9]*/192.168.1.1/g" \
     $(find ./feeds/luci/modules/luci-mod-system/ -type f -name "flash.js") \
     package/base-files/files/bin/config_generate 2>/dev/null || true
 
+# 修改主机名
 sed -i "s/hostname='.*'/hostname='FWRT'/g" package/base-files/files/bin/config_generate
 
+# 修改 Argon 主题颜色
 find ./ -name "cascade.css" -exec sed -i 's/#5e72e4/#31A1A1/g; s/#483d8b/#31A1A1/g' {} \;
 find ./ -name "dark.css"    -exec sed -i 's/#5e72e4/#31A1A1/g; s/#483d8b/#31A1A1/g' {} \;
 
+# 写入配置文件 (.config)
 cat >> .config <<EOF
 CONFIG_PACKAGE_luci-app-zerotier=y
 CONFIG_PACKAGE_luci-app-adguardhome=y
@@ -185,13 +178,9 @@ CONFIG_COREMARK_ENABLE_MULTITHREADING=y
 CONFIG_COREMARK_NUMBER_OF_THREADS=6
 EOF
 
-install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_ttyd-nopass.sh"      \
-    "package/base-files/files/etc/uci-defaults/99_ttyd-nopass" 2>/dev/null || true
+# 运行自定义脚本 (如果有)
+install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_ttyd-nopass.sh" "package/base-files/files/etc/uci-defaults/99_ttyd-nopass" 2>/dev/null || true
+install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_set_argon_primary" "package/base-files/files/etc/uci-defaults/99_set_argon_primary" 2>/dev/null || true
+install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_dropbear_setup.sh" "package/base-files/files/etc/uci-defaults/99_dropbear_setup" 2>/dev/null || true
 
-install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_set_argon_primary" \
-    "package/base-files/files/etc/uci-defaults/99_set_argon_primary" 2>/dev/null || true
-
-install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_dropbear_setup.sh" \
-    "package/base-files/files/etc/uci-defaults/99_dropbear_setup" 2>/dev/null || true
-
-echo "diy.sh 执行完毕！你现在可以放心 make 了。"
+echo "diy.sh 执行完毕！"
