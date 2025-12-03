@@ -1,7 +1,7 @@
 #!/bin/bash
 # ========================================================
-# 2025.12.03 终极整合版 diy.sh
-# 适配 WRT-CORE.yml 流程
+# 2025.12.03 编译修复最终版 diy.sh
+# 修复核心：使用 wget 下载官方 Makefile，避免格式缩进错误
 # ========================================================
 
 set -e
@@ -13,13 +13,13 @@ UPDATE_PACKAGE() {
     local PKG_NAME="$1" PKG_REPO="$2" PKG_BRANCH="$3" PKG_SPECIAL="$4"
     read -ra NAMES <<< "$PKG_NAME"
 
-    # 清理旧包，防止冲突
+    # 清理旧包
     for NAME in "${NAMES[@]}"; do
         find feeds/luci/ feeds/packages/ package/ -maxdepth 3 -type d \
             \( -name "$NAME" -o -name "luci-*-$NAME" \) -exec rm -rf {} + 2>/dev/null || true
     done
 
-    # 识别仓库地址
+    # 识别仓库
     if [[ $PKG_REPO == http* ]]; then
         REPO_NAME=$(basename "$PKG_REPO" .git)
     else
@@ -27,10 +27,10 @@ UPDATE_PACKAGE() {
         PKG_REPO="https://github.com/$PKG_REPO.git"
     fi
 
-    # 克隆仓库
+    # 克隆
     git clone --depth=1 --branch "$PKG_BRANCH" "$PKG_REPO" "package/$REPO_NAME" || exit 1
 
-    # 处理特殊包结构
+    # 处理
     case "$PKG_SPECIAL" in
         "pkg")
             for NAME in "${NAMES[@]}"; do
@@ -50,14 +50,12 @@ UPDATE_PACKAGE() {
 # ===================== 2. 拉取第三方插件 =====================
 echo "正在拉取第三方包..."
 
-# 基础插件
 UPDATE_PACKAGE "luci-app-poweroff"        "esirplayground/luci-app-poweroff" "main"
 UPDATE_PACKAGE "luci-app-tailscale"       "asvow/luci-app-tailscale"         "main"
 UPDATE_PACKAGE "openwrt-gecoosac"         "lwb1978/openwrt-gecoosac"         "main"
 UPDATE_PACKAGE "luci-app-openlist2"       "sbwml/luci-app-openlist2"         "main"
 UPDATE_PACKAGE "luci-app-quickfile"       "sbwml/luci-app-quickfile"         "main"
 
-# 科学与工具 (Kenzok8)
 UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria naiveproxy v2ray-core v2ray-geodata v2ray-geoview v2ray-plugin tuic-client chinadns-ng ipt2socks tcping trojan-plus simple-obfs shadowsocksr-libev luci-app-passwall smartdns luci-app-smartdns v2dat mosdns luci-app-mosdns taskd luci-lib-xterm luci-lib-taskd luci-app-ssr-plus luci-app-passwall2 luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky luci-app-openclash mihomo luci-app-dockerman docker-lan-bridge docker dockerd luci-app-nikki frp luci-app-ddns-go ddns-go" "kenzok8/small-package" "main" "pkg"
 
 # 修复 quickfile 编译路径
@@ -69,61 +67,23 @@ sed -i 's|$(INSTALL_BIN) $(PKG_BUILD_DIR)/quickfile-$(ARCH_PACKAGES).*|$(INSTALL
 find package/ -name Makefile -type f -exec sed -i 's/PKG_MIRROR_HASH:=/#PKG_MIRROR_HASH:=/g' {} \;
 sed -i 's/PKG_HASH:=.*/PKG_HASH:=fed5cd22f00f30cc4c2e5329f94e2b8a901df9fa45ee255cb70e2b0b42344477/g' tools/libdeflate/Makefile
 
-# --- 修复 2: libnl-tiny (必须包含 InstallDev) ---
+
+# --- 修复 2: libnl-tiny (改用 wget 下载官方文件，确保缩进正确) ---
 echo "正在修复 libnl-tiny..."
+
+# 1. 暴力清理所有可能存在的旧版本 (feeds 和 package 下都删)
+rm -rf package/feeds/base/libnl-tiny
+rm -rf package/libs/libnl-tiny
+
+# 2. 重建目录
 mkdir -p package/libs/libnl-tiny
 
-cat > package/libs/libnl-tiny/Makefile << 'EOF'
-include $(TOPDIR)/rules.mk
+# 3. 下载官方 Makefile (包含 InstallDev)
+# 使用 wget 下载避免脚本生成时的 TAB/空格 问题
+wget -O package/libs/libnl-tiny/Makefile https://raw.githubusercontent.com/openwrt/openwrt/master/package/libs/libnl-tiny/Makefile
 
-PKG_NAME:=libnl-tiny
-PKG_RELEASE:=1
+echo "libnl-tiny 修复完成 (使用官方 Makefile)"
 
-PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=https://git.openwrt.org/project/libnl-tiny.git
-PKG_SOURCE_DATE:=2025-03-19
-PKG_SOURCE_VERSION:=c0df580adbd4d555ecc1962dbe88e91d75b67a4e
-PKG_MIRROR_HASH:=1064a27824d99a93cbf8dbc808caf2cb277f1825b378ec6076d2ecfb8866a81f
-
-PKG_MAINTAINER:=Felix Fietkau <nbd@nbd.name>
-PKG_LICENSE:=LGPL-2.1
-PKG_LICENSE_FILES:=COPYING
-
-include $(BUILD_DIR)/package.mk
-
-define Package/libnl-tiny
-  SECTION:=libs
-  CATEGORY:=Libraries
-  TITLE:=Small version of libnl
-endef
-
-define Package/libnl-tiny/description
-This package contains a stripped down version of libnl
-endef
-
-define Build/Compile
-	$(MAKE) -C $(PKG_BUILD_DIR) \
-		CC="$(TARGET_CC)" \
-		CPPFLAGS="$(TARGET_CPPFLAGS)" \
-		CFLAGS="$(TARGET_CFLAGS)" \
-		LDFLAGS="$(TARGET_LDFLAGS)"
-endef
-
-# 关键: 让 ucode 能找到头文件
-define Build/InstallDev
-	$(INSTALL_DIR) $(1)/usr/lib/pkgconfig $(1)/usr/include/libnl-tiny
-	$(CP) $(PKG_BUILD_DIR)/include/* $(1)/usr/include/libnl-tiny
-	$(CP) $(PKG_BUILD_DIR)/libnl-tiny.so* $(1)/usr/lib/
-	$(CP) $(PKG_BUILD_DIR)/libnl-tiny.pc $(1)/usr/lib/pkgconfig/
-endef
-
-define Package/libnl-tiny/install
-	$(INSTALL_DIR) $(1)/usr/lib
-	$(CP) $(PKG_BUILD_DIR)/libnl-tiny.so* $(1)/usr/lib/
-endef
-
-$(eval $(call BuildPackage,libnl-tiny))
-EOF
 
 # --- 修复 3: 防止 apk 版本号报错 (只修 Kernel) ---
 find include/ -name "kernel*.mk" -type f -exec sed -i 's/~/./g' {} + 2>/dev/null
