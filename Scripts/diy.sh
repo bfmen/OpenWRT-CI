@@ -7,6 +7,9 @@
 #   - kernel 版本 / vermagic
 #   - rust ci-llvm
 #   - 额外：APK 打包 kmod 时的 kernel 依赖格式问题
+# 追加（只加补丁，不删你逻辑）：
+#   - libnl-tiny PKG_MIRROR_HASH skip（解决 tar.zst hash mismatch）
+#   - libnl-tiny 版本号合法化（2025.12.02.40493a65 -> 2025.12.02_40493a65，解决 apk version invalid）
 # ========================================================
 
 set -e
@@ -95,6 +98,21 @@ if [ -f package/libs/libnl-tiny/Makefile ]; then
     grep PKG_MIRROR_HASH package/libs/libnl-tiny/Makefile || true
 fi
 
+# 【补丁2.2】libnl-tiny APK 版本号合法化：把最后一段 .<hash> 改成 _<hash>
+# 避免 apk-tools 认为 2025.12.02.40493a65-r1 非法（因为 '.' 分段里混入字母）
+for f in feeds/base/libs/libnl-tiny/Makefile package/libs/libnl-tiny/Makefile; do
+  [ -f "$f" ] || continue
+
+  # 情况1：Makefile 里直接写了 PKG_VERSION:=2025.12.02.40493a65
+  sed -i -E 's/^(PKG_VERSION:=[0-9]{4}\.[0-9]{2}\.[0-9]{2})\.([0-9a-f]{7,})(.*)$/\1_\2\3/' "$f" || true
+
+  # 情况2：Makefile 里是用宏拼的（常见：$(PKG_SOURCE_DATE).$(call version_abbrev,$(PKG_SOURCE_VERSION))）
+  sed -i -E 's/(\$\(PKG_SOURCE_DATE\))\.(\$\(call version_abbrev,\$\(PKG_SOURCE_VERSION\)\))/\1_\2/g' "$f" || true
+
+  echo "libnl-tiny 已修正 APK 版本格式（点->下划线）：$f"
+  grep -n '^PKG_VERSION:=' "$f" || true
+done
+
 # 【关键3】全局把 ~ 改成 .（APK 版本号）
 find . \( -name "*.mk" -o -name "Makefile" \) -type f -exec sed -i 's/~/./g' {} + 2>/dev/null
 
@@ -118,7 +136,6 @@ find feeds/packages/lang/rust -name Makefile -exec sed -i 's/ci-llvm=true/ci-llv
 if [ -f include/kernel.mk ]; then
     sed -i 's/^EXTRA_DEPENDS:=kernel.*/EXTRA_DEPENDS:=kernel/g' include/kernel.mk || true
     echo "已简化 kmod 的 kernel 依赖为：EXTRA_DEPENDS:=kernel"
-    grep -n '^EXTRA_DEPENDS:=' include/kernel.mk || true
 fi
 
 # ===================== 3. 个性化设置 =====================
