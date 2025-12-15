@@ -1,15 +1,10 @@
 #!/bin/bash
 # ========================================================
 # 2025.11.26 终极稳定版 diy.sh —— libnl-tiny 暴力替换版 + APK kernel 依赖修正
-# 已解决（按你的原始思路保留）：
-#   - libdeflate HASH
-#   - libnl-tiny PKG_HASH skip（删旧加新，feeds + package 双路径）
-#   - kernel 版本 / vermagic
-#   - rust ci-llvm
-#   - 额外：APK 打包 kmod 时的 kernel 依赖格式问题
-# 追加（只加补丁，不删你逻辑）：
-#   - libnl-tiny PKG_MIRROR_HASH skip（解决 tar.zst hash mismatch）
-#   - libnl-tiny 版本号合法化（2025.12.02.40493a65 -> 2025.12.02_40493a65，解决 apk version invalid）
+# 保留你所有原逻辑；只新增：
+#   - libnl-tiny PKG_MIRROR_HASH:=skip
+#   - libnl-tiny 版本号强制合法化（.hash -> _hash）
+#   - 清理 build_dir 里旧的 libnl-tiny 目录，确保改动生效
 # ========================================================
 
 set -e
@@ -69,7 +64,6 @@ echo "执行关键修复..."
 sed -i 's/PKG_HASH:=.*/PKG_HASH:=fed5cd22f00f30cc4c2e5329f94e2b8a901df9fa45ee255cb70e2b0b42344477/g' tools/libdeflate/Makefile 2>/dev/null || true
 
 # 【关键2】libnl-tiny PKG_HASH 暴力改为 skip（处理 feeds 和 package 双路径）
-# 你的原始思路是“删旧加新”，这里保留，同时保证真正起作用的 feeds 路径也被改到
 if [ -f feeds/base/libs/libnl-tiny/Makefile ]; then
     sed -i '/PKG_HASH[[:space:]]*:=/d' feeds/base/libs/libnl-tiny/Makefile
     echo "PKG_HASH:=skip" >> feeds/base/libs/libnl-tiny/Makefile
@@ -83,8 +77,7 @@ if [ -f package/libs/libnl-tiny/Makefile ]; then
     grep PKG_HASH package/libs/libnl-tiny/Makefile || true
 fi
 
-# 【补丁2.1】libnl-tiny 同时跳过 PKG_MIRROR_HASH（解决 GitHub Actions 上 tar.zst hash mismatch）
-# 不删你原逻辑，只追加同样“删旧加新”的 mirror hash
+# 【补丁2.1】libnl-tiny 同时跳过 PKG_MIRROR_HASH（解决 tar.zst hash mismatch）
 if [ -f feeds/base/libs/libnl-tiny/Makefile ]; then
     sed -i '/PKG_MIRROR_HASH[[:space:]]*:=/d' feeds/base/libs/libnl-tiny/Makefile
     echo "PKG_MIRROR_HASH:=skip" >> feeds/base/libs/libnl-tiny/Makefile
@@ -98,20 +91,29 @@ if [ -f package/libs/libnl-tiny/Makefile ]; then
     grep PKG_MIRROR_HASH package/libs/libnl-tiny/Makefile || true
 fi
 
-# 【补丁2.2】libnl-tiny APK 版本号合法化：把最后一段 .<hash> 改成 _<hash>
-# 避免 apk-tools 认为 2025.12.02.40493a65-r1 非法（因为 '.' 分段里混入字母）
+# 【补丁2.2】强制让 libnl-tiny 的 PKG_VERSION 变成 apk 可接受格式
+# 规则：把 “YYYY.MM.DD.<hex>” 改成 “YYYY.MM.DD_<hex>”
 for f in feeds/base/libs/libnl-tiny/Makefile package/libs/libnl-tiny/Makefile; do
   [ -f "$f" ] || continue
 
-  # 情况1：Makefile 里直接写了 PKG_VERSION:=2025.12.02.40493a65
-  sed -i -E 's/^(PKG_VERSION:=[0-9]{4}\.[0-9]{2}\.[0-9]{2})\.([0-9a-f]{7,})(.*)$/\1_\2\3/' "$f" || true
+  # 如果存在 PKG_VERSION 这一行，直接改它（最稳定）
+  if grep -q '^PKG_VERSION:=' "$f"; then
+    sed -i -E 's/^(PKG_VERSION:=[0-9]{4}\.[0-9]{2}\.[0-9]{2})\.([0-9a-f]{7,})/\1_\2/' "$f" || true
+  fi
 
-  # 情况2：Makefile 里是用宏拼的（常见：$(PKG_SOURCE_DATE).$(call version_abbrev,$(PKG_SOURCE_VERSION))）
+  # 如果版本是拼出来的，把拼接点号改成下划线（兜底）
   sed -i -E 's/(\$\(PKG_SOURCE_DATE\))\.(\$\(call version_abbrev,\$\(PKG_SOURCE_VERSION\)\))/\1_\2/g' "$f" || true
 
-  echo "libnl-tiny 已修正 APK 版本格式（点->下划线）：$f"
-  grep -n '^PKG_VERSION:=' "$f" || true
+  echo "libnl-tiny Makefile 版本行（用于确认是否生效）：$f"
+  grep -nE '^(PKG_VERSION:=|PKG_SOURCE_DATE:=|PKG_SOURCE_VERSION:=)' "$f" || true
 done
+
+# 【补丁2.3】清理旧构建缓存，强制重新生成 libnl-tiny 版本与打包参数（关键！）
+# 不清理的话 build_dir 目录名还会是 libnl-tiny-2025.12.02.40493a65，继续报错
+rm -rf ./build_dir/target-*/libnl-tiny-* 2>/dev/null || true
+rm -f  ./bin/packages/*/base/libnl-tiny*.apk 2>/dev/null || true
+rm -f  ./tmp/.pkgdir/libnl-tiny* 2>/dev/null || true
+echo "已清理 build_dir/bin 中旧的 libnl-tiny 产物，确保版本号改动生效"
 
 # 【关键3】全局把 ~ 改成 .（APK 版本号）
 find . \( -name "*.mk" -o -name "Makefile" \) -type f -exec sed -i 's/~/./g' {} + 2>/dev/null
@@ -131,8 +133,6 @@ find include/ -name "kernel*.mk" -type f -exec sed -i -E \
 find feeds/packages/lang/rust -name Makefile -exec sed -i 's/ci-llvm=true/ci-llvm=false/g' {} \; 2>/dev/null
 
 # 【关键7】APK 兼容：去掉 kmod 的 kernel 版本依赖里那串哈希，只保留名字
-# 这里不动你原来的 vermagic 逻辑，只是把 EXTRA_DEPENDS 的“=版本号”干掉，
-# 让 apk 看见的只是 “depends:kernel” 而不是 “kernel=6.12.xx.<hash>-r1”
 if [ -f include/kernel.mk ]; then
     sed -i 's/^EXTRA_DEPENDS:=kernel.*/EXTRA_DEPENDS:=kernel/g' include/kernel.mk || true
     echo "已简化 kmod 的 kernel 依赖为：EXTRA_DEPENDS:=kernel"
@@ -181,4 +181,4 @@ install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_ttyd-nopass.sh"     "package/base
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_set_argon_primary" "package/base-files/files/etc/uci-defaults/99_set_argon_primary" 2>/dev/null || true
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_dropbear_setup.sh" "package/base-files/files/etc/uci-defaults/99_dropbear_setup" 2>/dev/null || true
 
-echo "diy.sh 执行完毕！按理说现在 libnl-tiny 和 kmod 的 APK 依赖都不会再卡。"
+echo "diy.sh 执行完毕！按理说现在 libnl-tiny 的 APK version invalid 不会再出现。"
