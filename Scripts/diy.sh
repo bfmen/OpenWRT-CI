@@ -1,23 +1,26 @@
 #!/bin/bash
 # ========================================================
 # 2025.11.26 终极稳定版 diy.sh
-# 集成：libnl-tiny 暴力替换 + APK kernel 依赖修正 + CI libtool 修复(增强版)
+# 集成：libnl-tiny 暴力替换 + APK kernel 依赖修正 + Libtool 降级修复(解决 automake-1.17 缺失)
 # ========================================================
 
 set -e
 
-echo "开始执行 diy.sh（集成 libtool 增强修复版）"
+echo "开始执行 diy.sh（集成 Libtool 降级修复版）"
 
-# ===================== 0. CI libtool 修复 (增强版) =====================
-# 解决 GitHub Actions 下 libtool 2.5.4 执行 bootstrap 导致的 "Bogus AC_PROG_LIBTOOL" 错误
-# 原理：直接修改 tools/libtool/Makefile，将 ./bootstrap 和 autoreconf 命令替换为 true (空操作)
-# 这样编译时会直接使用源码包自带的 configure，跳过重新生成配置文件的过程
+# ===================== 0. CI libtool 修复 (降级方案) =====================
+# 错误现象：libtool-2.5.4 需要 automake-1.17，但 CI 环境没有，导致编译失败
+# 解决方案：强制将 tools/libtool 降级回最稳定的 2.4.7 版本
 if [ -f tools/libtool/Makefile ]; then
-    sed -i 's/\.\/bootstrap/true/g' tools/libtool/Makefile
-    sed -i 's/autoreconf/true/g' tools/libtool/Makefile
-    # 保留原本的注释逻辑作为双重保险
-    sed -i 's/^\(.*autoreconf.*\)$/#\1/' tools/libtool/Makefile
-    echo "已应用 tools/libtool 修复：强制跳过 bootstrap/autoreconf"
+    # 1. 修改版本号为 2.4.7
+    sed -i 's/PKG_VERSION:=2.5.4/PKG_VERSION:=2.4.7/g' tools/libtool/Makefile
+    # 2. 修改 Hash 为 2.4.7 的官方 Hash
+    sed -i 's/PKG_HASH:=.*/PKG_HASH:=04e96c2404ea70c590c546eba3c39a860a4f680d9a3933e8d6409224823907c5/g' tools/libtool/Makefile
+    
+    # 3. 清理针对 2.5.4 的补丁（因为版本不同，补丁会打不上导致报错，必须删掉）
+    rm -rf tools/libtool/patches
+    
+    echo "已执行：将 tools/libtool 强制降级为 2.4.7 (避开 automake-1.17 错误)"
 fi
 
 # ===================== 1. 先拉取所有第三方包 =====================
@@ -154,4 +157,4 @@ install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_ttyd-nopass.sh"      "package/bas
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_set_argon_primary" "package/base-files/files/etc/uci-defaults/99_set_argon_primary" 2>/dev/null || true
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_dropbear_setup.sh" "package/base-files/files/etc/uci-defaults/99_dropbear_setup" 2>/dev/null || true
 
-echo "diy.sh 执行完毕！libtool 补丁已应用。"
+echo "diy.sh 执行完毕！libtool 已降级至 2.4.7 以解决编译错误。"
