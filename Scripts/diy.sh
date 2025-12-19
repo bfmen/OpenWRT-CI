@@ -430,7 +430,8 @@ fix_openwrt_apk_versions() {
   log "扫描与修复完成。"
 }
 
-fix_openwrt_apk_versions package
+# opkg模式下不需要了
+#fix_openwrt_apk_versions package
 
 #fix cmake minimum version issue
 if ! grep -q "CMAKE_POLICY_VERSION_MINIMUM" include/cmake.mk; then
