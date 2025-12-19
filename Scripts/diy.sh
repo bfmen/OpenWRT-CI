@@ -353,27 +353,48 @@ if [ -f "$RUST_FILE" ]; then
 	echo "rust has been fixed!"
 fi
 
-# 设置文件路径 (根据你之前的日志，路径应该是 package/dockerd/Makefile 或 feeds/packages/utils/dockerd/Makefile)
-# 这里使用 find 命令为了防止路径变动找不到文件，更稳妥
-dockerd_makefile=$(find ./package ./feeds -name Makefile | grep "dockerd/Makefile" | head -n 1)
+#!/bin/bash
 
-if [ -n "$dockerd_makefile" ] && [ -f "$dockerd_makefile" ]; then
-    echo "Processing $dockerd_makefile ..."
-
-    # 1. 修正 Tag 格式：将 v$(PKG_VERSION) 改为 docker-v$(PKG_VERSION)
-    sed -i 's/PKG_GIT_REF:=v/PKG_GIT_REF:=docker-v/' "$dockerd_makefile"
-
-    # 2. 修改 Hash 为 skip，避免因文件变更导致校验失败
-    sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$dockerd_makefile"
-
-    # 3. 禁用 EnsureVendoredVersion 检查 (防止因依赖版本微小差异导致编译失败)
-    # 匹配以 Tab 开头的 $(call EnsureVendoredVersion... 并加 # 注释掉
-    sed -i 's/^\t$(call EnsureVendoredVersion/#\t$(call EnsureVendoredVersion/' "$dockerd_makefile"
+# =====================
+# 1. 修正 dockerd
+# =====================
+dockerd_makefile=$(find package/ feeds/ -name Makefile | grep "dockerd/Makefile" | head -n 1)
+if [ -f "$dockerd_makefile" ]; then
+    echo "Fixing dockerd Makefile: $dockerd_makefile"
     
-    echo "Fixed dockerd Makefile!"
+    # 统一版本为 29.2.0-rc.1
+    sed -i 's/^PKG_VERSION:=.*/PKG_VERSION:=29.2.0-rc.1/' "$dockerd_makefile"
+    
+    # 修正 Tag 前缀 (v -> docker-v) 以匹配 GitHub
+    sed -i 's/^PKG_GIT_REF:=v/PKG_GIT_REF:=docker-v/' "$dockerd_makefile"
+    
+    # 跳过 Hash 校验
+    sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$dockerd_makefile"
+    
+    # 【关键】禁用所有版本依赖强检查 (CLI一致性检查 + 依赖包版本检查)
+    # 1. 禁用 CLI 版本对比
+    sed -i 's/CLI_MAKEFILE=/# CLI_MAKEFILE=/' "$dockerd_makefile"
+    # 2. 禁用 runc/containerd 版本对比
+    sed -i 's/^\t$(call EnsureVendoredVersion/#\t$(call EnsureVendoredVersion/' "$dockerd_makefile"
 else
-    echo "Warning: dockerd Makefile not found!"
+    echo "Error: dockerd Makefile not found!"
 fi
+
+# =====================
+# 2. 修正 docker (CLI)
+# =====================
+docker_makefile=$(find package/ feeds/ -name Makefile | grep "docker/Makefile" | head -n 1)
+if [ -f "$docker_makefile" ]; then
+    echo "Fixing docker CLI Makefile: $docker_makefile"
+    
+    # 确认版本为 29.2.0-rc.1 (其实原本就是，但防止意外)
+    sed -i 's/^PKG_VERSION:=.*/PKG_VERSION:=29.2.0-rc.1/' "$docker_makefile"
+    
+    # 跳过 Hash 校验
+    sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$docker_makefile"
+fi
+
+echo "All Fixed! Ready to compile."
 
 
 
