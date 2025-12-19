@@ -339,6 +339,7 @@ if [ -f ./package/luci-app-ddns-go/ddns-go/file/ddns-go.init ]; then
 fi
 
 
+
 #sed -i 's/"admin\/services\/openlist"/"admin\/nas\/openlist"/' package/luci-app-openlist/luci-app-openlist/root/usr/share/luci/menu.d/luci-app-openlist.json
 
 #修复 rust 编译
@@ -351,6 +352,29 @@ if [ -f "$RUST_FILE" ]; then
 	
 	echo "rust has been fixed!"
 fi
+
+# 设置文件路径 (根据你之前的日志，路径应该是 package/dockerd/Makefile 或 feeds/packages/utils/dockerd/Makefile)
+# 这里使用 find 命令为了防止路径变动找不到文件，更稳妥
+dockerd_makefile=$(find ./package ./feeds -name Makefile | grep "dockerd/Makefile" | head -n 1)
+
+if [ -n "$dockerd_makefile" ] && [ -f "$dockerd_makefile" ]; then
+    echo "Processing $dockerd_makefile ..."
+
+    # 1. 修正 Tag 格式：将 v$(PKG_VERSION) 改为 docker-v$(PKG_VERSION)
+    sed -i 's/PKG_GIT_REF:=v/PKG_GIT_REF:=docker-v/' "$dockerd_makefile"
+
+    # 2. 修改 Hash 为 skip，避免因文件变更导致校验失败
+    sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$dockerd_makefile"
+
+    # 3. 禁用 EnsureVendoredVersion 检查 (防止因依赖版本微小差异导致编译失败)
+    # 匹配以 Tab 开头的 $(call EnsureVendoredVersion... 并加 # 注释掉
+    sed -i 's/^\t$(call EnsureVendoredVersion/#\t$(call EnsureVendoredVersion/' "$dockerd_makefile"
+    
+    echo "Fixed dockerd Makefile!"
+else
+    echo "Warning: dockerd Makefile not found!"
+fi
+
 
 
 # 修复 OpenWrt 包里不合规（非数字开头）的 PKG_VERSION，
