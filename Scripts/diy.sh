@@ -176,9 +176,9 @@ provided_config_lines=(
     "CONFIG_PACKAGE_luci-app-filetransfer=y"
     "CONFIG_PACKAGE_openssh-sftp-server=y"
     "CONFIG_PACKAGE_luci-app-frpc=y" 
-    #"CONFIG_OPKG_USE_CURL=y"
-    #"CONFIG_PACKAGE_opkg=y"   
-    #"CONFIG_USE_APK=n"
+    "CONFIG_OPKG_USE_CURL=y"
+    "CONFIG_PACKAGE_opkg=y"   
+    "CONFIG_USE_APK=n"
     "CONFIG_PACKAGE_luci-app-tailscale=y"
     #"CONFIG_PACKAGE_luci-app-msd_lite=y"
     "CONFIG_PACKAGE_luci-app-lucky=y"
@@ -293,13 +293,14 @@ install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_ttyd-nopass.sh" "package/base-fil
 
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_set_argon_primary" "package/base-files/files/etc/uci-defaults/99_set_argon_primary"
 
-#install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99-distfeeds.conf" "package/emortal/default-settings/files/99-distfeeds.conf"
-#sed -i '/define Package\/default-settings\/install/a \
-#\t$(INSTALL_DIR) $(1)/etc\n\t$(INSTALL_DATA) ./files/99-distfeeds.conf $(1)/etc/99-distfeeds.conf' \
-#package/emortal/default-settings/Makefile
-#sed -i "/exit 0/i\\
-#[ -f \'/etc/99-distfeeds.conf\' ] && mv \'/etc/99-distfeeds.conf\' \'/etc/opkg/distfeeds.conf\'\n\
-#sed -ri \'/check_signature/s@^[^#]@#&@\' /etc/opkg.conf\n" "package/emortal/default-settings/files/99-default-settings"
+install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99-distfeeds.conf" "package/emortal/default-settings/files/99-distfeeds.conf"
+sed -i '/define Package\/default-settings\/install/a \
+\t$(INSTALL_DIR) $(1)/etc\n\t$(INSTALL_DATA) ./files/99-distfeeds.conf $(1)/etc/99-distfeeds.conf' \
+package/emortal/default-settings/Makefile
+
+sed -i "/exit 0/i\\
+[ -f \'/etc/99-distfeeds.conf\' ] && mv \'/etc/99-distfeeds.conf\' \'/etc/opkg/distfeeds.conf\'\n\
+sed -ri \'/check_signature/s@^[^#]@#&@\' /etc/opkg.conf\n" "package/emortal/default-settings/files/99-default-settings"
 
 #解决 dropbear 配置的 bug
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_dropbear_setup.sh" "package/base-files/files/etc/uci-defaults/99_dropbear_setup"
