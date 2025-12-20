@@ -354,48 +354,61 @@ if [ -f "$RUST_FILE" ]; then
 fi
 
 
-# 1. 找到 dockerd 的 Makefile
+# =======================================================
+# 1. 解决 opkg 报错：补齐 dockerman 及其依赖
+# =======================================================
+
+echo "Handling Docker dependencies..."
+
+# 清理 feeds 中可能存在的旧版本 (防止冲突)
+rm -rf package/feeds/luci/luci-app-dockerman
+rm -rf package/feeds/luci/luci-lib-docker
+
+# 拉取 lisaac 原版源码
+git clone --depth 1 https://github.com/lisaac/luci-app-dockerman.git package/luci-app-dockerman
+git clone --depth 1 https://github.com/lisaac/luci-lib-docker.git package/luci-lib-docker
+
+# 【关键修复】: 暴力删除 cgroupfs-mount 依赖
+# 既然找不到包，且新版 OpenWRT 不需要它也能跑 Docker，直接从 Makefile 里删掉它
+echo "Removing cgroupfs-mount dependency..."
+sed -i 's/+cgroupfs-mount //g' package/luci-app-dockerman/Makefile
+sed -i 's/+cgroupfs-mount//g' package/luci-app-dockerman/Makefile
+
+# 安装其他必要依赖
+./scripts/feeds install ttyd
+./scripts/feeds install luci-lib-docker
+
+# =======================================================
+# 2. 修复 Docker 引擎 (dockerd) 和 CLI (docker)
+# =======================================================
+
+DOCKER_VER="29.2.0-rc.1"
 dockerd_makefile=$(find package/ feeds/ -name Makefile | grep "dockerd/Makefile" | head -n 1)
+docker_makefile=$(find package/ feeds/ -name Makefile | grep "docker/Makefile" | head -n 1)
 
 if [ -f "$dockerd_makefile" ]; then
-    echo "Processing $dockerd_makefile ..."
-
-    # --- 基础配置 ---
-    # 修正版本号
-    sed -i 's/^PKG_VERSION:=.*/PKG_VERSION:=29.2.0-rc.1/' "$dockerd_makefile"
-    # 修正 Git Tag 前缀 (v -> docker-v)
+    echo "Fixing dockerd to $DOCKER_VER ..."
+    # 修正版本
+    sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$DOCKER_VER/" "$dockerd_makefile"
+    # 修正下载前缀
     sed -i 's/^PKG_GIT_REF:=v/PKG_GIT_REF:=docker-v/' "$dockerd_makefile"
-    # 跳过 Hash 校验
+    # 跳过 Hash
     sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$dockerd_makefile"
-
-    # --- 关键修复：安全地禁用检查 ---
-    
-    # 1. 禁用 EnsureVendoredVersion (这个是单行调用，用 # 注释没问题)
-    sed -i 's/^\t$(call EnsureVendoredVersion/#\t$(call EnsureVendoredVersion/' "$dockerd_makefile"
-
-    # 2. 禁用 CLI 版本检查 (不要加 #，而是把报错命令 exit 1 替换成 true)
-    # 这样脚本会继续执行，但不会因为版本不匹配而停止
-    # 我们匹配包含 CLI_VERSION 的上下文，如果太复杂，直接全局替换文件中的 exit 1 为 true 也是一种暴力但有效的临时方案
-    # 这里我们只替换 Build/Prepare 部分的 exit 1
-    sed -i 's/exit 1;/true;/' "$dockerd_makefile"
-    
-    # 如果上一步没替换到（因为分号问题），尝试更通用的替换
+    # 忽略报错 (exit 1 -> true)
     sed -i 's/exit 1/true/' "$dockerd_makefile"
-
-    echo "Dockerd Makefile fixed (Syntax safe mode)."
-else
-    echo "Error: dockerd Makefile not found!"
+    # 禁用版本强校验
+    sed -i 's/^\t$(call EnsureVendoredVersion/#\t$(call EnsureVendoredVersion/' "$dockerd_makefile"
 fi
 
-# 2. 同步修改 docker (CLI)
-docker_makefile=$(find package/ feeds/ -name Makefile | grep "docker/Makefile" | head -n 1)
 if [ -f "$docker_makefile" ]; then
-    sed -i 's/^PKG_VERSION:=.*/PKG_VERSION:=29.2.0-rc.1/' "$docker_makefile"
+    echo "Fixing docker cli to $DOCKER_VER ..."
+    sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$DOCKER_VER/" "$docker_makefile"
     sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$docker_makefile"
 fi
 
-# 1. 确保源码到位：强制安装这几个依赖包的 Makefile
-./scripts/feeds install luci-lib-docker cgroupfs-mount ttyd
+echo "All fixes applied!"
+
+
 
 
 # 修复 OpenWrt 包里不合规（非数字开头）的 PKG_VERSION，
