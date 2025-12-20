@@ -394,6 +394,10 @@ if [ -f "$docker_makefile" ]; then
     sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$docker_makefile"
 fi
 
+# 1. 确保源码到位：强制安装这几个依赖包的 Makefile
+./scripts/feeds install luci-lib-docker cgroupfs-mount ttyd
+
+
 # 修复 OpenWrt 包里不合规（非数字开头）的 PKG_VERSION，
 # 搜索范围：传入目录（默认 .）向下最多 3 层的所有 Makefile
 fix_openwrt_apk_versions() {
