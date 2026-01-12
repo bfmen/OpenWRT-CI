@@ -263,6 +263,10 @@ fi
     #"CONFIG_PACKAGE_luci-app-quickfile=y"
     #"CONFIG_PACKAGE_quickfile=y"
 	"CONFIG_PACKAGE_libuver-zero=y"
+	"CONFIG_PACKAGE_kmod-sched-tbf=y"
+	"CONFIG_PACKAGE_kmod-sched-htb=y"
+	"CONFIG_PACKAGE_tc-full=y"
+	"CONFIG_PACKAGE_kmod-sched-netem=y"
 )
 
 [[ $WRT_CONFIG == "IPQ"* ]] && provided_config_lines+=(
