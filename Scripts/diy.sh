@@ -262,6 +262,7 @@ fi
     "CONFIG_PACKAGE_luci-app-openclash=y"
     #"CONFIG_PACKAGE_luci-app-quickfile=y"
     #"CONFIG_PACKAGE_quickfile=y"
+	"CONFIG_PACKAGE_libuver-zero=y"
 )
 
 [[ $WRT_CONFIG == "IPQ"* ]] && provided_config_lines+=(
