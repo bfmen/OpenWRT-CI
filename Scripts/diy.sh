@@ -136,7 +136,7 @@ sed -i "/^CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_/{
 keywords_to_delete=(
     #"xiaomi_ax3600" "xiaomi_ax9000" "xiaomi_ax1800" "glinet" "jdcloud_ax6600" "linksys" "link_nn6600" "re-cs-02" "nn6600" "mr7350"
     "uugamebooster" "luci-app-wol" "luci-i18n-wol-zh-cn" "CONFIG_TARGET_INITRAMFS" "ddns" "luci-app-advancedplus" "mihomo" "nikki"
-    "smartdns" "kucat" "bootstrap" "kucat"
+    "smartdns" "kucat" "bootstrap" "kucat" "luci-app-partexp" "luci-app-upnp"
 )
 
 [[ $WRT_CONFIG == *"WIFI-NO"* ]] && keywords_to_delete+=("usb" "wpad" "hostapd")
@@ -166,7 +166,7 @@ provided_config_lines=(
     "CONFIG_PACKAGE_luci-i18n-ddns-go-zh-cn=y"
     "CONFIG_PACKAGE_luci-app-argon-config=y"
     "CONFIG_PACKAGE_nano=y"
-    "CONFIG_BUSYBOX_CONFIG_LSUSB=n"
+    #"CONFIG_BUSYBOX_CONFIG_LSUSB=n"
     "CONFIG_PACKAGE_luci-app-netspeedtest=y"
     "CONFIG_PACKAGE_luci-app-vlmcsd=y"
     "CONFIG_COREMARK_OPTIMIZE_O3=y"
@@ -238,7 +238,7 @@ fi
     #"CONFIG_PACKAGE_resize2fs=y"
     "CONFIG_PACKAGE_qrencode=y"
     "CONFIG_PACKAGE_smartmontools-drivedb=y"
-    "CONFIG_PACKAGE_usbutils=y"
+    #"CONFIG_PACKAGE_usbutils=y"
     "CONFIG_PACKAGE_default-settings=y"
     "CONFIG_PACKAGE_default-settings-chn=y"
     "CONFIG_PACKAGE_iptables-mod-conntrack-extra=y"
