@@ -59,7 +59,7 @@ UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
         naiveproxy v2ray-core v2ray-geodata v2ray-geoview v2ray-plugin \
         tuic-client chinadns-ng ipt2socks tcping trojan-plus simple-obfs shadowsocksr-libev \
         luci-app-passwall smartdns luci-app-smartdns v2dat mosdns luci-app-mosdns \
-        taskd luci-lib-xterm luci-lib-taskd luci-app-ssr-plus luci-app-passwall2 \
+        taskd luci-lib-xterm luci-lib-taskd luci-app-passwall2 \
         luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest \
         luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky luci-app-openclash mihomo \
         luci-app-nikki frp luci-app-ddns-go ddns-go docker dockerd" "kenzok8/small-package" "main" "pkg"
@@ -359,32 +359,68 @@ if [ -f "$RUST_FILE" ]; then
 fi
 
 
+#!/bin/bash
+
 # =======================================================
-# 1. 解决 opkg 报错：补齐 dockerman 及其依赖
+# 1. 解决 opkg 报错：正确补齐 dockerman 及其依赖
 # =======================================================
 
 echo "Handling Docker dependencies..."
 
-# 清理 feeds 中可能存在的旧版本 (防止冲突)
+# 1.1 清理环境：删除 feeds 里可能存在的冲突包 (非常重要)
 rm -rf package/feeds/luci/luci-app-dockerman
 rm -rf package/feeds/luci/luci-lib-docker
+rm -rf package/luci-app-dockerman
+rm -rf package/luci-lib-docker
 
-# 拉取 lisaac 原版源码
-git clone --depth 1 https://github.com/lisaac/luci-app-dockerman.git package/luci-app-dockerman
-git clone --depth 1 https://github.com/lisaac/luci-lib-docker.git package/luci-lib-docker
+# 1.2 处理 luci-app-dockerman (源码在 applications/ 子目录下)
+echo "Cloning luci-app-dockerman..."
+git clone --depth 1 https://github.com/lisaac/luci-app-dockerman.git temp_dockerman
+# 提取真正的应用目录到 package/ 下
+mv temp_dockerman/applications/luci-app-dockerman package/luci-app-dockerman
+# 删除临时文件
+rm -rf temp_dockerman
 
-# 【关键修复】: 暴力删除 cgroupfs-mount 依赖
-# 既然找不到包，且新版 OpenWRT 不需要它也能跑 Docker，直接从 Makefile 里删掉它
-echo "Removing cgroupfs-mount dependency..."
-sed -i 's/+cgroupfs-mount //g' package/luci-app-dockerman/Makefile
-sed -i 's/+cgroupfs-mount//g' package/luci-app-dockerman/Makefile
+# 1.3 处理 luci-lib-docker
+echo "Cloning luci-lib-docker..."
+git clone --depth 1 https://github.com/lisaac/luci-lib-docker.git temp_libdocker
 
-# 安装其他必要依赖
+# 智能判断目录结构 (防止仓库结构变动，或者你记错了)
+if [ -d "temp_libdocker/collections/luci-lib-docker" ]; then
+    # 情况A: Makefile 在 collections/luci-lib-docker 里 (你提到的结构)
+    echo "Found lib in collections/..."
+    mv temp_libdocker/collections/luci-lib-docker package/luci-lib-docker
+elif [ -d "temp_libdocker/src" ]; then
+    # 情况B: 某些旧版本在 src/ 里
+    mv temp_libdocker/src package/luci-lib-docker
+elif [ -f "temp_libdocker/Makefile" ]; then
+    # 情况C: 仓库根目录就是包 (如果是平铺结构)
+    mv temp_libdocker package/luci-lib-docker
+else
+    # 保底: 无论结构如何，把 clone 下来的东西都放进去，让 OpenWrt 递归去扫
+    echo "Unknown structure, moving whole repo..."
+    mv temp_libdocker package/luci-lib-docker
+fi
+# 清理可能残留的临时目录 (如果是 mv 走了就不会报错，没 mv 走就强制删掉)
+rm -rf temp_libdocker
+
+# 1.4 【关键修复】: 暴力删除 cgroupfs-mount 依赖
+# 确保在 package/luci-app-dockerman 已经就位后执行
+if [ -f "package/luci-app-dockerman/Makefile" ]; then
+    echo "Removing cgroupfs-mount dependency..."
+    sed -i 's/+cgroupfs-mount //g' package/luci-app-dockerman/Makefile
+    sed -i 's/+cgroupfs-mount//g' package/luci-app-dockerman/Makefile
+else
+    echo "Error: luci-app-dockerman not found in package/ !"
+fi
+
+# 1.5 安装其他必要依赖
 ./scripts/feeds install ttyd
 ./scripts/feeds install luci-lib-docker
 
 # =======================================================
 # 2. 修复 Docker 引擎 (dockerd) 和 CLI (docker)
+#    (这部分代码保持不变，直接照抄之前的)
 # =======================================================
 
 DOCKER_VER="29.2.0-rc.1"
@@ -393,15 +429,10 @@ docker_makefile=$(find package/ feeds/ -name Makefile | grep "docker/Makefile" |
 
 if [ -f "$dockerd_makefile" ]; then
     echo "Fixing dockerd to $DOCKER_VER ..."
-    # 修正版本
     sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$DOCKER_VER/" "$dockerd_makefile"
-    # 修正下载前缀
     sed -i 's/^PKG_GIT_REF:=v/PKG_GIT_REF:=docker-v/' "$dockerd_makefile"
-    # 跳过 Hash
     sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$dockerd_makefile"
-    # 忽略报错 (exit 1 -> true)
     sed -i 's/exit 1/true/' "$dockerd_makefile"
-    # 禁用版本强校验
     sed -i 's/^\t$(call EnsureVendoredVersion/#\t$(call EnsureVendoredVersion/' "$dockerd_makefile"
 fi
 
