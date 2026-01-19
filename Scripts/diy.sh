@@ -531,3 +531,80 @@ fix_openwrt_apk_versions() {
 if ! grep -q "CMAKE_POLICY_VERSION_MINIMUM" include/cmake.mk; then
   echo 'CMAKE_OPTIONS += -DCMAKE_POLICY_VERSION_MINIMUM=3.5' >> include/cmake.mk
 fi
+
+#修复go
+# ---- begin: ensure Go >= 1.25.6 -------------------
+REQUIRED_GO_VER="1.25.6"
+
+ver_ge() {
+  # return 0 if $1 >= $2 (semantic numeric compare, dot separated)
+  [ "$1" = "$2" ] && return 0
+  local a b
+  a="$1"; b="$2"
+  # use sort -V if available
+  if command -v sort >/dev/null 2>&1; then
+    highest=$(printf '%s\n%s\n' "$a" "$b" | sort -V | tail -n1)
+    [ "$highest" = "$a" ]
+    return $?
+  fi
+  # fallback: naive compare by parts
+  IFS=. read -r -a A <<<"$a"; IFS=. read -r -a B <<<"$b"
+  local i max
+  max=$(( ${#A[@]} > ${#B[@]} ? ${#A[@]} : ${#B[@]} ))
+  for ((i=0;i<max;i++)); do
+    local ai=${A[i]:-0}; local bi=${B[i]:-0}
+    if ((10#$ai > 10#$bi)); then return 0; fi
+    if ((10#$ai < 10#$bi)); then return 1; fi
+  done
+  return 0
+}
+
+get_go_ver() {
+  if ! command -v go >/dev/null 2>&1; then
+    echo ""
+    return
+  fi
+  # go version go1.25.5 linux/amd64
+  gv="$(go version 2>/dev/null || true)"
+  if [[ $gv =~ go([0-9]+(\.[0-9]+)*) ]]; then
+    echo "${BASH_REMATCH[1]}"
+  else
+    echo ""
+  fi
+}
+
+install_go() {
+  local ver="$1"
+  local arch
+  arch=$(uname -m)
+  case "$arch" in
+    x86_64|amd64) arch="linux-amd64" ;;
+    aarch64|arm64) arch="linux-arm64" ;;
+    *) arch="linux-amd64" ;; # 保底
+  esac
+  tarball="go${ver}.${arch}.tar.gz"
+  url="https://go.dev/dl/${tarball}"
+  echo "Installing Go ${ver} for ${arch} from ${url} ..."
+  wget -q "${url}" -O "/tmp/${tarball}" || { echo "下载 go 失败: ${url}"; return 1; }
+  sudo rm -rf /usr/local/go
+  sudo tar -C /usr/local -xzf "/tmp/${tarball}" || { echo "解压 go 失败"; return 1; }
+  # 在 GitHub Actions 中写入 GITHUB_PATH，保证后续步骤也能识别
+  if [ -n "${GITHUB_PATH:-}" ]; then
+    echo "/usr/local/go/bin" >> "${GITHUB_PATH}"
+  fi
+  # 也在当前 shell 生效
+  export PATH="/usr/local/go/bin:${PATH}"
+  echo "Go ${ver} installed to /usr/local/go"
+  return 0
+}
+
+current_go_ver="$(get_go_ver)"
+if [ -z "$current_go_ver" ] || ! ver_ge "$current_go_ver" "$REQUIRED_GO_VER"; then
+  echo "当前 go: ${current_go_ver:-none}，需要 >= ${REQUIRED_GO_VER}，将安装/更新 go ..."
+  if ! install_go "$REQUIRED_GO_VER"; then
+    echo "警告: 无法自动安装 go ${REQUIRED_GO_VER}，请在 workflow 中使用 actions/setup-go 或手动预装 go."
+  fi
+else
+  echo "go 版本满足要求: $current_go_ver"
+fi
+# ---- end: ensure Go >= 1.25.6 ---------------------
