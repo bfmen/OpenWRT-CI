@@ -189,6 +189,8 @@ provided_config_lines=(
     "CONFIG_PACKAGE_luci-app-cifs-mount=y"
 	"CONFIG_PACKAGE_kmod-fs-cifs=y"
     "CONFIG_PACKAGE_cifsmount=y"
+    "CONFIG_PACKAGE_luci-app-mosdns=y"
+    "CONFIG_PACKAGE_luci-app-wolplus=y"
 )
 
 #[[ $WRT_CONFIG == *"WIFI-NO"* ]] && provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n")
@@ -573,3 +575,16 @@ ensure_latest_go() {
 
 # 执行函数
 ensure_latest_go
+
+#######################################
+# Fix PPP / UPnP issues
+#######################################
+mkdir -p package/base-files/files/etc/uci-defaults
+cat << 'EOF' > package/base-files/files/etc/uci-defaults/99-custom-fixes
+#!/bin/sh
+sed -i '8c maxfail 1' /etc/ppp/options
+sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh
+sed -i '10c option external_ip "59.111.160.244"' /etc/config/upnpd
+exit 0
+EOF
+chmod +x package/base-files/files/etc/uci-defaults/99-custom-fixes
