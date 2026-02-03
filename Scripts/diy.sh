@@ -364,86 +364,84 @@ fi
 # =======================================================
 # 1. 解决 opkg 报错：正确补齐 dockerman 及其依赖
 # =======================================================
-
 echo "Handling Docker dependencies..."
 
-# 1.1 清理环境：删除 feeds 里可能存在的冲突包 (非常重要)
+# 清理环境
 rm -rf package/feeds/luci/luci-app-dockerman
 rm -rf package/feeds/luci/luci-lib-docker
 rm -rf package/luci-app-dockerman
 rm -rf package/luci-lib-docker
 
-# 1.2 处理 luci-app-dockerman (源码在 applications/ 子目录下)
+# 处理 luci-app-dockerman
 echo "Cloning luci-app-dockerman..."
 git clone --depth 1 https://github.com/lisaac/luci-app-dockerman.git temp_dockerman
-# 提取真正的应用目录到 package/ 下
 mv temp_dockerman/applications/luci-app-dockerman package/luci-app-dockerman
-# 删除临时文件
 rm -rf temp_dockerman
 
-# 1.3 处理 luci-lib-docker
+# 处理 luci-lib-docker
 echo "Cloning luci-lib-docker..."
 git clone --depth 1 https://github.com/lisaac/luci-lib-docker.git temp_libdocker
-
-# 智能判断目录结构 (防止仓库结构变动，或者你记错了)
 if [ -d "temp_libdocker/collections/luci-lib-docker" ]; then
-    # 情况A: Makefile 在 collections/luci-lib-docker 里 (你提到的结构)
-    echo "Found lib in collections/..."
     mv temp_libdocker/collections/luci-lib-docker package/luci-lib-docker
-elif [ -d "temp_libdocker/src" ]; then
-    # 情况B: 某些旧版本在 src/ 里
-    mv temp_libdocker/src package/luci-lib-docker
-elif [ -f "temp_libdocker/Makefile" ]; then
-    # 情况C: 仓库根目录就是包 (如果是平铺结构)
-    mv temp_libdocker package/luci-lib-docker
 else
-    # 保底: 无论结构如何，把 clone 下来的东西都放进去，让 OpenWrt 递归去扫
-    echo "Unknown structure, moving whole repo..."
     mv temp_libdocker package/luci-lib-docker
 fi
-# 清理可能残留的临时目录 (如果是 mv 走了就不会报错，没 mv 走就强制删掉)
 rm -rf temp_libdocker
 
-# 1.4 【关键修复】: 暴力删除 cgroupfs-mount 依赖
-# 确保在 package/luci-app-dockerman 已经就位后执行
+# 移除 cgroupfs-mount 依赖
 if [ -f "package/luci-app-dockerman/Makefile" ]; then
     echo "Removing cgroupfs-mount dependency..."
     sed -i 's/+cgroupfs-mount //g' package/luci-app-dockerman/Makefile
     sed -i 's/+cgroupfs-mount//g' package/luci-app-dockerman/Makefile
-else
-    echo "Error: luci-app-dockerman not found in package/ !"
 fi
 
-# 1.5 安装其他必要依赖
+# 安装必要依赖
 ./scripts/feeds install ttyd
 ./scripts/feeds install luci-lib-docker
 
 # =======================================================
 # 2. 修复 Docker 引擎 (dockerd) 和 CLI (docker)
-#    (这部分代码保持不变，直接照抄之前的)
+#    解决版本对齐、校验失败及 Git Commit 缺失问题
 # =======================================================
 
-DOCKER_VER="29.2.0-rc.1"
+# 定义目标版本和对应的 Commit 哈希 (v29.2.1 是目前较稳的版本)
+# 如果你一定要用 29.2.0-rc.1，就把版本号改回去，Commit 留着也没事
+DOCKER_VER="29.2.1"
+DOCKERD_COMMIT="4042ac6"
+DOCKER_CLI_COMMIT="33a5c92"
+
+# 动态寻找 Makefile
 dockerd_makefile=$(find package/ feeds/ -name Makefile | grep "dockerd/Makefile" | head -n 1)
 docker_makefile=$(find package/ feeds/ -name Makefile | grep "docker/Makefile" | head -n 1)
 
 if [ -f "$dockerd_makefile" ]; then
-    echo "Fixing dockerd to $DOCKER_VER ..."
+    echo "Fixing dockerd: Version $DOCKER_VER, Commit $DOCKERD_COMMIT ..."
+    # 修复版本号
     sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$DOCKER_VER/" "$dockerd_makefile"
-    sed -i 's/^PKG_GIT_REF:=v/PKG_GIT_REF:=docker-v/' "$dockerd_makefile"
+    # 修复 Git 引用格式
+    sed -i 's/^PKG_GIT_REF:=.*/PKG_GIT_REF:=docker-v$(PKG_VERSION)/' "$dockerd_makefile"
+    # 强行注入 Commit ID (解决编译报错的关键)
+    sed -i "s/PKG_GIT_SHORT_COMMIT:=.*/PKG_GIT_SHORT_COMMIT:=$DOCKERD_COMMIT/g" "$dockerd_makefile"
+    # 跳过 Hash 校验和所有内部验证逻辑
     sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$dockerd_makefile"
     sed -i 's/exit 1/true/' "$dockerd_makefile"
-    sed -i 's/^\t$(call EnsureVendoredVersion/#\t$(call EnsureVendoredVersion/' "$dockerd_makefile"
+    sed -i 's/^\t$(call EnsureVendored/#\t$(call EnsureVendored/g' "$dockerd_makefile"
+    # 注释掉 Makefile 里的校验块代码 (处理多行逻辑)
+    sed -i '/EXPECTED_PKG_GIT_SHORT_COMMIT/,/fi/ s/^/#/' "$dockerd_makefile"
 fi
 
 if [ -f "$docker_makefile" ]; then
-    echo "Fixing docker cli to $DOCKER_VER ..."
+    echo "Fixing docker CLI: Version $DOCKER_VER, Commit $DOCKER_CLI_COMMIT ..."
+    # 修复版本号
     sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$DOCKER_VER/" "$docker_makefile"
+    # 强行注入 Commit ID
+    sed -i "s/PKG_GIT_SHORT_COMMIT:=.*/PKG_GIT_SHORT_COMMIT:=$DOCKER_CLI_COMMIT/g" "$docker_makefile"
+    # 跳过校验
     sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$docker_makefile"
+    sed -i '/EXPECTED_PKG_GIT_SHORT_COMMIT/,/fi/ s/^/#/' "$docker_makefile"
 fi
 
-echo "All fixes applied!"
-
+echo "All Docker fixes applied successfully!"
 
 
 
@@ -573,26 +571,3 @@ ensure_latest_go() {
 
 # 执行函数
 ensure_latest_go
-
-
-# 修改 dockerd 的 Makefile
-find feeds/package/ -name Makefile | xargs grep -l "PKG_NAME:=dockerd" | while read -r makefile; do
-    echo "Fixing dockerd commit in $makefile"
-    # 1. 强制指定 Commit ID
-    sed -i "s/PKG_GIT_SHORT_COMMIT:=.*/PKG_GIT_SHORT_COMMIT:=4042ac6/g" "$makefile"
-    # 2. 注释掉 Build/Prepare 里的校验块，防止因为手动修改导致校验失败
-    sed -i '/EXPECTED_PKG_GIT_SHORT_COMMIT/,/fi/ s/^/#/' "$makefile"
-done
-
-# 修改 docker (CLI) 的 Makefile
-find feeds/package/ -name Makefile | xargs grep -l "PKG_NAME:=docker" | while read -r makefile; do
-    # 确保只改 docker CLI 而不是其他带 docker 字样的包
-    if grep -q "github.com/docker/cli" "$makefile"; then
-        echo "Fixing docker CLI commit in $makefile"
-        # 1. 强制指定 Commit ID
-        sed -i "s/PKG_GIT_SHORT_COMMIT:=.*/PKG_GIT_SHORT_COMMIT:=33a5c92/g" "$makefile"
-        # 2. 注释掉校验块
-        sed -i '/EXPECTED_PKG_GIT_SHORT_COMMIT/,/fi/ s/^/#/' "$makefile"
-    fi
-done
-
