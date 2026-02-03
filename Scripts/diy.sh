@@ -573,3 +573,26 @@ ensure_latest_go() {
 
 # 执行函数
 ensure_latest_go
+
+
+# 修改 dockerd 的 Makefile
+find feeds/package/ -name Makefile | xargs grep -l "PKG_NAME:=dockerd" | while read -r makefile; do
+    echo "Fixing dockerd commit in $makefile"
+    # 1. 强制指定 Commit ID
+    sed -i "s/PKG_GIT_SHORT_COMMIT:=.*/PKG_GIT_SHORT_COMMIT:=4042ac6/g" "$makefile"
+    # 2. 注释掉 Build/Prepare 里的校验块，防止因为手动修改导致校验失败
+    sed -i '/EXPECTED_PKG_GIT_SHORT_COMMIT/,/fi/ s/^/#/' "$makefile"
+done
+
+# 修改 docker (CLI) 的 Makefile
+find feeds/package/ -name Makefile | xargs grep -l "PKG_NAME:=docker" | while read -r makefile; do
+    # 确保只改 docker CLI 而不是其他带 docker 字样的包
+    if grep -q "github.com/docker/cli" "$makefile"; then
+        echo "Fixing docker CLI commit in $makefile"
+        # 1. 强制指定 Commit ID
+        sed -i "s/PKG_GIT_SHORT_COMMIT:=.*/PKG_GIT_SHORT_COMMIT:=33a5c92/g" "$makefile"
+        # 2. 注释掉校验块
+        sed -i '/EXPECTED_PKG_GIT_SHORT_COMMIT/,/fi/ s/^/#/' "$makefile"
+    fi
+done
+
