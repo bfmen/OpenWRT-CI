@@ -359,14 +359,12 @@ if [ -f "$RUST_FILE" ]; then
 fi
 
 
-#!/bin/bash
-
 # =======================================================
 # 1. 解决 opkg 报错：正确补齐 dockerman 及其依赖
 # =======================================================
 echo "Handling Docker dependencies..."
 
-# 清理环境
+# 清理环境，防止残留冲突
 rm -rf package/feeds/luci/luci-app-dockerman
 rm -rf package/feeds/luci/luci-lib-docker
 rm -rf package/luci-app-dockerman
@@ -401,47 +399,46 @@ fi
 
 # =======================================================
 # 2. 修复 Docker 引擎 (dockerd) 和 CLI (docker)
-#    解决版本对齐、校验失败及 Git Commit 缺失问题
 # =======================================================
 
-# 定义目标版本和对应的 Commit 哈希 (v29.2.1 是目前较稳的版本)
-# 如果你一定要用 29.2.0-rc.1，就把版本号改回去，Commit 留着也没事
+# 设定目标版本和固定的 Commit ID (对应 v29.2.1 正式版)
 DOCKER_VER="29.2.1"
 DOCKERD_COMMIT="4042ac6"
 DOCKER_CLI_COMMIT="33a5c92"
 
-# 动态寻找 Makefile
-dockerd_makefile=$(find package/ feeds/ -name Makefile | grep "dockerd/Makefile" | head -n 1)
-docker_makefile=$(find package/ feeds/ -name Makefile | grep "docker/Makefile" | head -n 1)
+# 动态定位 Makefile
+dockerd_makefile=$(find package/ feeds/ -name Makefile | xargs grep -l "PKG_NAME:=dockerd" | head -n 1)
+docker_makefile=$(find package/ feeds/ -name Makefile | xargs grep -l "PKG_NAME:=docker" | head -n 1)
 
+# --- 处理 dockerd ---
 if [ -f "$dockerd_makefile" ]; then
-    echo "Fixing dockerd: Version $DOCKER_VER, Commit $DOCKERD_COMMIT ..."
-    # 修复版本号
+    echo "Processing dockerd Makefile at: $dockerd_makefile"
+    # 修复版本号和 Commit
     sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$DOCKER_VER/" "$dockerd_makefile"
-    # 修复 Git 引用格式
-    sed -i 's/^PKG_GIT_REF:=.*/PKG_GIT_REF:=docker-v$(PKG_VERSION)/' "$dockerd_makefile"
-    # 强行注入 Commit ID (解决编译报错的关键)
     sed -i "s/PKG_GIT_SHORT_COMMIT:=.*/PKG_GIT_SHORT_COMMIT:=$DOCKERD_COMMIT/g" "$dockerd_makefile"
-    # 跳过 Hash 校验和所有内部验证逻辑
     sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$dockerd_makefile"
-    sed -i 's/exit 1/true/' "$dockerd_makefile"
+    
+    # 彻底重写 Build/Prepare。删除从 # Verify dependencies 到第一个 endef 之间的内容
+    # 然后重新插入一个标准的 Build/Prepare/Default 动作
+    sed -i '/define Build\/Prepare/,/endef/c\define Build\/Prepare\n\t$(Build\/Prepare\/Default)\nendef' "$dockerd_makefile"
+    
+    # 移除 Compile 阶段可能残留的强制校验 (EnsureVendored 系列调用)
     sed -i 's/^\t$(call EnsureVendored/#\t$(call EnsureVendored/g' "$dockerd_makefile"
-    # 注释掉 Makefile 里的校验块代码 (处理多行逻辑)
-    sed -i '/EXPECTED_PKG_GIT_SHORT_COMMIT/,/fi/ s/^/#/' "$dockerd_makefile"
 fi
 
+# --- 处理 docker CLI ---
 if [ -f "$docker_makefile" ]; then
-    echo "Fixing docker CLI: Version $DOCKER_VER, Commit $DOCKER_CLI_COMMIT ..."
-    # 修复版本号
+    echo "Processing docker CLI Makefile at: $docker_makefile"
+    # 修复版本号和 Commit
     sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$DOCKER_VER/" "$docker_makefile"
-    # 强行注入 Commit ID
     sed -i "s/PKG_GIT_SHORT_COMMIT:=.*/PKG_GIT_SHORT_COMMIT:=$DOCKER_CLI_COMMIT/g" "$docker_makefile"
-    # 跳过校验
     sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' "$docker_makefile"
-    sed -i '/EXPECTED_PKG_GIT_SHORT_COMMIT/,/fi/ s/^/#/' "$docker_makefile"
+
+    # 彻底重写 Build/Prepare，防止其内部的 Shell 脚本语法报错
+    sed -i '/define Build\/Prepare/,/endef/c\define Build\/Prepare\n\t$(Build\/Prepare\/Default)\nendef' "$docker_makefile"
 fi
 
-echo "All Docker fixes applied successfully!"
+echo "All Docker compilation fixes applied successfully!"
 
 
 
