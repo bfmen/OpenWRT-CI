@@ -527,62 +527,7 @@ if ! grep -q "CMAKE_POLICY_VERSION_MINIMUM" include/cmake.mk; then
   echo 'CMAKE_OPTIONS += -DCMAKE_POLICY_VERSION_MINIMUM=3.5' >> include/cmake.mk
 fi
 
-patch_openwrt_go() {
-    # 1. 确定 Makefile 路径 (通常在 feeds/packages/lang/golang/golang/Makefile)
-    # 使用 find 增加容错，防止目录结构略有不同
-    local GO_MAKEFILE
-    GO_MAKEFILE=$(find feeds -name "Makefile" | grep "lang/golang/golang/Makefile" | head -n 1)
-
-    if [ -z "$GO_MAKEFILE" ]; then
-        echo "❌ Error: Could not find OpenWrt Go Makefile!"
-        return 1
-    fi
-    echo "found go makefile: $GO_MAKEFILE"
-
-    # 2. 获取 Go 最新版本号 (例如 1.25.6)
-    local LATEST_VER
-    LATEST_VER="$(curl -s "https://go.dev/VERSION?m=text" | head -n 1 | tr -d '[:space:]' | sed 's/^go//')"
-    
-    if [ -z "$LATEST_VER" ]; then
-        echo "❌ Error: Failed to fetch latest Go version."
-        return 1
-    fi
-
-    # 3. 检查当前 Makefile 里的版本
-    local CUR_VER
-    CUR_VER=$(grep "^PKG_VERSION:=" "$GO_MAKEFILE" | cut -d= -f2)
-    echo "Current OpenWrt Go version: $CUR_VER"
-    echo "Target Latest Go version:   $LATEST_VER"
-
-    if [ "$CUR_VER" == "$LATEST_VER" ]; then
-        echo "✅ Version is already up to date."
-        return 0
-    fi
-
-    # 4. 计算源码包的 SHA256 Hash (这是最关键的一步，不改 Hash 会导致下载校验失败)
-    # 注意：OpenWrt 编译 Go 用的是 src 包，不是 linux-amd64 包！
-    echo "☁️  Downloading source info to calculate hash..."
-    local SRC_URL="https://go.dev/dl/go${LATEST_VER}.src.tar.gz"
-    local NEW_HASH
-    NEW_HASH=$(curl -sL "$SRC_URL" | sha256sum | awk '{print $1}')
-
-    if [ -z "$NEW_HASH" ] || [ ${#NEW_HASH} -ne 64 ]; then
-        echo "❌ Error: Failed to calculate SHA256 hash."
-        return 1
-    fi
-    echo "New Hash: $NEW_HASH"
-
-    # 5. 使用 sed 修改 Makefile
-    echo "🔧 Patching Makefile..."
-    sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$LATEST_VER/" "$GO_MAKEFILE"
-    sed -i "s/^PKG_HASH:=.*/PKG_HASH:=$NEW_HASH/" "$GO_MAKEFILE"
-
-    # 6. 验证修改
-    echo "--------------------------------------"
-    grep -E "^PKG_VERSION|^PKG_HASH" "$GO_MAKEFILE"
-    echo "--------------------------------------"
-    echo "✅ OpenWrt Go toolchain patched to $LATEST_VER successfully!"
-}
-
-# 执行补丁
-patch_openwrt_go || exit 1
+  rm -rf feeds/packages/lang/golang                                                                                     
+  git clone https://github.com/openwrt/packages --depth=1 --filter=blob:none --sparse /tmp/openwrt-packages
+  cd /tmp/openwrt-packages && git sparse-checkout set lang/golang                                                       
+  cp -r /tmp/openwrt-packages/lang/golang feeds/packages/lang/golang  
