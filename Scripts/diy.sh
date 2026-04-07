@@ -527,7 +527,11 @@ if ! grep -q "CMAKE_POLICY_VERSION_MINIMUM" include/cmake.mk; then
   echo 'CMAKE_OPTIONS += -DCMAKE_POLICY_VERSION_MINIMUM=3.5' >> include/cmake.mk
 fi
 
+  # 升级 golang 到支持 go.mod >= 1.26 的版本
+  WRT_DIR=$(pwd)  # diy.sh 在 wrt/ 目录下执行                                                                           
   rm -rf feeds/packages/lang/golang                                                                                     
-  git clone https://github.com/openwrt/packages --depth=1 --filter=blob:none --sparse /tmp/openwrt-packages
+  git clone https://github.com/openwrt/packages --depth=1 --filter=blob:none --sparse /tmp/openwrt-packages             
   cd /tmp/openwrt-packages && git sparse-checkout set lang/golang                                                       
-  cp -r /tmp/openwrt-packages/lang/golang feeds/packages/lang/golang  
+  cp -r /tmp/openwrt-packages/lang/golang "$WRT_DIR/feeds/packages/lang/golang"                                         
+  cd "$WRT_DIR"                                                                                                         
+  ./scripts/feeds install golang
