@@ -133,14 +133,20 @@ sed -i "/^CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_/{
 }" ./.config
 
 # 修复 Linux 6.18+ 新增 Kconfig 选项导致 syncconfig 交互式报错
-# 原因：新内核引入了 CONFIG_PERSISTENT_HUGE_ZERO_FOLIO，旧 ipq60xx 的
-# kernel config 片段里没有该项，非交互式 CI 环境下 syncconfig 会直接出错
-for cfg_file in target/linux/qualcommax/ipq60xx/config-6.*; do
-    if [ -f "$cfg_file" ] && ! grep -q "PERSISTENT_HUGE_ZERO_FOLIO" "$cfg_file"; then
-        echo '# CONFIG_PERSISTENT_HUGE_ZERO_FOLIO is not set' >> "$cfg_file"
-        echo "已修复内核 config: $cfg_file"
+# 旧方案用 glob 匹配，文件不存在时静默失败；改用 find 确保可靠
+# 同时改用 CONFIG_X=n 格式，避免 OpenWrt kconfig.pl 把注释行当普通注释跳过
+echo "=== [kernel config fix] 搜索 qualcommax config 片段 ==="
+_found=0
+while IFS= read -r -d '' _cfg; do
+    _found=1
+    if ! grep -q "PERSISTENT_HUGE_ZERO_FOLIO" "$_cfg"; then
+        echo 'CONFIG_PERSISTENT_HUGE_ZERO_FOLIO=n' >> "$_cfg"
+        echo "[kernel config fix] 已写入: $_cfg"
+    else
+        echo "[kernel config fix] 已存在，跳过: $_cfg"
     fi
-done
+done < <(find target/linux/qualcommax -name "config-*" -type f -print0 2>/dev/null)
+[ "$_found" -eq 0 ] && echo "[kernel config fix] WARNING: 未找到任何 config-* 文件，请检查路径！"
 
 
 keywords_to_delete=(
