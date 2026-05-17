@@ -132,6 +132,16 @@ sed -i "/^CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_/{
     /$keep_pattern/!d
 }" ./.config
 
+# 修复 Linux 6.18+ 新增 Kconfig 选项导致 syncconfig 交互式报错
+# 原因：新内核引入了 CONFIG_PERSISTENT_HUGE_ZERO_FOLIO，旧 ipq60xx 的
+# kernel config 片段里没有该项，非交互式 CI 环境下 syncconfig 会直接出错
+for cfg_file in target/linux/qualcommax/ipq60xx/config-6.*; do
+    if [ -f "$cfg_file" ] && ! grep -q "PERSISTENT_HUGE_ZERO_FOLIO" "$cfg_file"; then
+        echo '# CONFIG_PERSISTENT_HUGE_ZERO_FOLIO is not set' >> "$cfg_file"
+        echo "已修复内核 config: $cfg_file"
+    fi
+done
+
 
 keywords_to_delete=(
     #"xiaomi_ax3600" "xiaomi_ax9000" "xiaomi_ax1800" "glinet" "jdcloud_ax6600" "linksys" "link_nn6600" "re-cs-02" "nn6600" "mr7350"
