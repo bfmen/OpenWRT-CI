@@ -133,48 +133,48 @@ sed -i "/^CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_/{
 }" ./.config
 
 # ===================================================================
-# 修复 Linux 6.18+ 新增 Kconfig 选项 PERSISTENT_HUGE_ZERO_FOLIO
-# 导致 syncconfig 在非交互环境下报错
+# 修复 Linux 6.18+ 新增 Kconfig 选项导致 syncconfig 报错（打地鼠版）
 # ===================================================================
-# 上一版失败原因：
-#   1) 用 bash glob (config-6.*) 没匹配到文件时静默失败
-#   2) 用 =n 格式属于非标准内核 config 语法
-# 本版修正：
-#   - 用 find 递归查找，不再依赖文件名规则
-#   - 用标准 "# CONFIG_X is not set" 格式（构建日志第 8749 行
-#     已证实此格式被 OpenWrt 与内核 syncconfig 都正确识别）
-#   - 加调试输出，便于排查
+# 实际用到的 config 文件（从构建日志的 kconfig.pl 调用得知）：
+#   - target/linux/generic/config-6.18
+#   - target/linux/qualcommax/config-6.18
+#   - target/linux/qualcommax/ipq60xx/config-default
+# 每次构建发现新的 (NEW) 选项就追加到 NEW_OPTS 数组里。
+NEW_OPTS=(
+    PERSISTENT_HUGE_ZERO_FOLIO   # 上一轮修好
+    NO_PAGE_MAPCOUNT              # 本轮新冒出来的
+)
+
 echo "================================================================"
-echo "[kernel-fix] 开始: PERSISTENT_HUGE_ZERO_FOLIO 修复"
+echo "[kernel-fix] 待处理选项: ${NEW_OPTS[*]}"
 if [ -d "target/linux/qualcommax/" ]; then
-    echo "[kernel-fix] qualcommax 目录列表（前 20 项）:"
-    ls -1 target/linux/qualcommax/ 2>/dev/null | head -20
+    echo "[kernel-fix] qualcommax/ 内容:"
+    ls -1 target/linux/qualcommax/ 2>/dev/null
 else
     echo "[kernel-fix] ##[error] target/linux/qualcommax/ 不存在！"
 fi
-if [ -d "target/linux/qualcommax/ipq60xx/" ]; then
-    echo "[kernel-fix] ipq60xx 目录列表（前 20 项）:"
-    ls -1 target/linux/qualcommax/ipq60xx/ 2>/dev/null | head -20
-else
-    echo "[kernel-fix] ##[error] target/linux/qualcommax/ipq60xx/ 不存在！"
-fi
 
-_fix_found=0
-_fix_written=0
+# 注意：除了 qualcommax/，generic/config-6.18 也是 kconfig.pl 的输入，
+# 所以也要扫描进去，避免遗漏
+_files=0
+_writes=0
 while IFS= read -r -d '' _cfg; do
-    _fix_found=$((_fix_found + 1))
-    if grep -q "PERSISTENT_HUGE_ZERO_FOLIO" "$_cfg"; then
-        echo "[kernel-fix] 已存在，跳过: $_cfg"
-    else
-        echo '# CONFIG_PERSISTENT_HUGE_ZERO_FOLIO is not set' >> "$_cfg"
-        _fix_written=$((_fix_written + 1))
-        echo "[kernel-fix] 已写入: $_cfg"
-        echo "[kernel-fix]   尾部确认: $(tail -1 "$_cfg")"
-    fi
-done < <(find target/linux/qualcommax -type f -name "config-*" -print0 2>/dev/null)
+    _files=$((_files + 1))
+    for _opt in "${NEW_OPTS[@]}"; do
+        if grep -q "CONFIG_${_opt}" "$_cfg"; then
+            echo "[kernel-fix] 已存在 CONFIG_${_opt}，跳过: $_cfg"
+        else
+            echo "# CONFIG_${_opt} is not set" >> "$_cfg"
+            _writes=$((_writes + 1))
+            echo "[kernel-fix] 已写入 CONFIG_${_opt} -> $_cfg"
+        fi
+    done
+done < <(find target/linux/generic target/linux/qualcommax \
+            -type f \( -name "config-*" -o -name "config-default" \) \
+            -print0 2>/dev/null)
 
-echo "[kernel-fix] 完成: 发现 $_fix_found 个 config 片段，新增写入 $_fix_written 个"
-[ "$_fix_found" -eq 0 ] && echo "[kernel-fix] ##[error] 没找到任何 config 片段文件！"
+echo "[kernel-fix] 完成: 扫描 $_files 个文件，写入 $_writes 条"
+[ "$_files" -eq 0 ] && echo "[kernel-fix] ##[error] 没找到任何 config 片段文件！"
 echo "================================================================"
 
 
