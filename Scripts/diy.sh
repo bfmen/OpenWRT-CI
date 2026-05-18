@@ -7,13 +7,11 @@ UPDATE_PACKAGE() {
 	local PKG_BRANCH=$3
 	local PKG_SPECIAL=$4
 	
-	# 清理旧的包(更精确的匹配)
 	read -ra PKG_NAMES <<< "$PKG_NAME"
 	for NAME in "${PKG_NAMES[@]}"; do
 		find feeds/luci/ feeds/packages/ package/ -maxdepth 3 -type d \( -name "$NAME" -o -name "luci-*-$NAME" \) -exec rm -rf {} + 2>/dev/null
 	done
 	
-	# 克隆仓库
 	if [[ $PKG_REPO == http* ]]; then
 		local REPO_NAME=$(basename "$PKG_REPO" .git)
 	else
@@ -44,9 +42,6 @@ UPDATE_PACKAGE() {
 UPDATE_PACKAGE "luci-app-poweroff" "esirplayground/luci-app-poweroff" "main"
 UPDATE_PACKAGE "luci-app-tailscale" "asvow/luci-app-tailscale" "main"
 UPDATE_PACKAGE "openwrt-gecoosac" "ysuolmai/openwrt-gecoosac" "main"
-#UPDATE_PACKAGE "luci-app-homeproxy" "immortalwrt/homeproxy" "master"
-#UPDATE_PACKAGE "luci-app-ddns-go" "sirpdboy/luci-app-ddns-go" "main"
-#UPDATE_PACKAGE "luci-app-alist" "sbwml/luci-app-alist" "main"
 UPDATE_PACKAGE "luci-app-openlist2" "sbwml/luci-app-openlist2" "main"
 
 #small-package
@@ -70,8 +65,6 @@ UPDATE_PACKAGE "openwrt-podman" "https://github.com/breeze303/openwrt-podman" "m
 UPDATE_PACKAGE "luci-app-quickfile" "https://github.com/sbwml/luci-app-quickfile" "main"
 sed -i 's|$(INSTALL_BIN) $(PKG_BUILD_DIR)/quickfile-$(ARCH_PACKAGES) $(1)/usr/bin/quickfile|$(INSTALL_BIN) $(PKG_BUILD_DIR)/quickfile-aarch64_generic $(1)/usr/bin/quickfile|' package/luci-app-quickfile/quickfile/Makefile
 
-#UPDATE_PACKAGE "frp" "https://github.com/ysuolmai/openwrt-frp.git" "main"
-
 # bandix
 UPDATE_PACKAGE "openwrt-bandix" "timsaya/openwrt-bandix" "main"
 UPDATE_PACKAGE "luci-app-bandix" "timsaya/luci-app-bandix" "main"
@@ -84,7 +77,6 @@ WRT_IP="192.168.1.1"
 WRT_NAME="FWRT"
 WRT_WIFI="FWRT"
 
-#修改immortalwrt.lan关联IP
 sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" $(find ./feeds/luci/modules/luci-mod-system/ -type f -name "flash.js")
 
 WIFI_SH=$(find ./target/linux/{mediatek/filogic,qualcommax}/base-files/etc/uci-defaults/ -type f -name "*set-wireless.sh")
@@ -104,7 +96,6 @@ sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" $CFG_FILE
 sed -i "s/hostname='.*'/hostname='$WRT_NAME'/g" $CFG_FILE
 
 
-# 只保留指定的 qualcommax_ipq60xx 设备
 if [[ $WRT_CONFIG == *"EMMC"* ]]; then
     keep_pattern="\(redmi_ax5-jdcloud\|jdcloud_re-ss-01\|jdcloud_re-cs-07\)=y$"
 else
@@ -128,7 +119,6 @@ for keyword in "${keywords_to_delete[@]}"; do
     sed -i "/$keyword/d" ./.config
 done
 
-# Configuration lines to append to .config
 provided_config_lines=(
     "CONFIG_PACKAGE_luci-app-zerotier=y"
     "CONFIG_PACKAGE_luci-i18n-zerotier-zh-cn=y"
@@ -228,7 +218,7 @@ for line in "${provided_config_lines[@]}"; do
 done
 
 # =======================================================
-# [pkg-fix] 替换 Makefile 中的 kmod-iptables 直接依赖为 kmod-nf-ipt
+# [pkg-fix] 替换 Makefile 中的 +kmod-iptables 直接依赖为 +kmod-nf-ipt
 # =======================================================
 echo "================================================================"
 echo "[pkg-fix] 替换 Makefile 中的 +kmod-iptables 依赖为 +kmod-nf-ipt"
@@ -236,17 +226,15 @@ echo "[pkg-fix] 替换 Makefile 中的 +kmod-iptables 依赖为 +kmod-nf-ipt"
 _affected=$(grep -rl "+kmod-iptables" package/ feeds/ 2>/dev/null || true)
 if [ -n "$_affected" ]; then
     _total=$(echo "$_affected" | wc -l)
-    echo "[pkg-fix] 发现 $_total 个 Makefile 依赖 kmod-iptables，前 15 个:"
+    echo "[pkg-fix] 发现 $_total 个文件依赖 kmod-iptables，前 15 个:"
     echo "$_affected" | head -15 | sed 's/^/  - /'
-
     while IFS= read -r _mk; do
         sed -i -E 's/\+kmod-iptables([^a-zA-Z0-9_-]|$)/+kmod-nf-ipt\1/g' "$_mk"
     done <<< "$_affected"
-
     _remain=$(grep -rlE "\+kmod-iptables([^a-zA-Z0-9_-]|$)" package/ feeds/ 2>/dev/null | wc -l)
     echo "[pkg-fix] 替换完成，残留 $_remain 处 (应为 0)"
 else
-    echo "[pkg-fix] 没有 Makefile 依赖 kmod-iptables (已是干净状态)"
+    echo "[pkg-fix] 没有文件依赖 kmod-iptables (已是干净状态)"
 fi
 
 sed -i '/^CONFIG_PACKAGE_kmod-iptables=/d' .config
@@ -255,8 +243,6 @@ echo "================================================================"
 
 # =======================================================
 # [pkg-fix-2] 替换 Makefile 中 +iptables 间接依赖为 +iptables-nft
-# 修复链路：sqm-scripts-nss/passwall 等 -> +iptables -> kmod-iptables
-# 精确匹配：不误伤 +iptables-mod-* / +iptables-nft / +ip6tables
 # =======================================================
 echo "================================================================"
 echo "[pkg-fix-2] 替换 Makefile 中的 +iptables 间接依赖为 +iptables-nft"
@@ -266,22 +252,78 @@ _affected2=$(grep -rlE '\+iptables([^-a-zA-Z0-9_]|$)' package/ feeds/ 2>/dev/nul
 
 if [ -n "$_affected2" ]; then
     _total2=$(echo "$_affected2" | wc -l)
-    echo "[pkg-fix-2] 发现 $_total2 个 Makefile 依赖 +iptables，前 15 个:"
+    echo "[pkg-fix-2] 发现 $_total2 个文件依赖 +iptables，前 15 个:"
     echo "$_affected2" | head -15 | sed 's/^/  - /'
-
     while IFS= read -r _mk; do
         sed -i -E 's/\+iptables([^-a-zA-Z0-9_]|$)/+iptables-nft\1/g' "$_mk"
     done <<< "$_affected2"
-
     _remain2=$(grep -rlE '\+iptables([^-a-zA-Z0-9_]|$)' package/ feeds/ 2>/dev/null \
         | xargs grep -lv 'PKG_NAME:=iptables' 2>/dev/null | wc -l)
     echo "[pkg-fix-2] 替换完成，残留 $_remain2 处 (应为 0)"
 else
-    echo "[pkg-fix-2] 没有 Makefile 依赖 +iptables (已是干净状态)"
+    echo "[pkg-fix-2] 没有文件依赖 +iptables (已是干净状态)"
 fi
 
 sed -i '/^CONFIG_PACKAGE_iptables=/d' .config
 echo '# CONFIG_PACKAGE_iptables is not set' >> .config
+echo "================================================================"
+
+# =======================================================
+# [pkg-fix-3] 清除 kmod-iptables 的文件安装，消除与 kmod-nf-ipt 的冲突
+# 根因：内核 CONFIG_IP_NF_IPTABLES=m 会让构建系统自动选中 kmod-iptables，
+# 绕过 Makefile 依赖链。让 kmod-iptables 变成不安装任何文件的空壳包，
+# 由 kmod-nf-ipt 提供相同的 .ko，功能不受影响，冲突消失。
+# =======================================================
+echo "================================================================"
+echo "[pkg-fix-3] 清除 kmod-iptables FILES/AUTOLOAD，消除与 kmod-nf-ipt 的文件冲突"
+
+KMOD_IPT_MK=$(grep -rl "define KernelPackage/iptables$" package/ target/ 2>/dev/null | head -n 1)
+if [ -n "$KMOD_IPT_MK" ]; then
+    echo "[pkg-fix-3] 找到定义文件: $KMOD_IPT_MK"
+    python3 - "$KMOD_IPT_MK" << 'PYEOF'
+import sys
+
+filename = sys.argv[1]
+with open(filename) as f:
+    lines = f.readlines()
+
+result = []
+in_ipt_block = False
+skip_continuation = False
+
+for line in lines:
+    stripped = line.strip()
+
+    if stripped == 'define KernelPackage/iptables':
+        in_ipt_block = True
+        result.append(line)
+        continue
+
+    if in_ipt_block and stripped == 'endef':
+        in_ipt_block = False
+        result.append(line)
+        continue
+
+    if in_ipt_block:
+        if skip_continuation:
+            if not stripped.endswith('\\'):
+                skip_continuation = False
+            continue
+        if stripped.startswith('FILES:=') or stripped.startswith('AUTOLOAD:='):
+            if stripped.endswith('\\'):
+                skip_continuation = True
+            continue
+
+    result.append(line)
+
+with open(filename, 'w') as f:
+    f.writelines(result)
+
+print(f'[pkg-fix-3] 完成: {filename}')
+PYEOF
+else
+    echo "[pkg-fix-3] 未找到 kmod-iptables 定义文件，跳过"
+fi
 echo "================================================================"
 
 
@@ -290,9 +332,7 @@ find ./ -name "dark.css" -exec sed -i 's/#5e72e4/#31A1A1/g; s/#483d8b/#31A1A1/g'
 find ./ -name "cascade.less" -exec sed -i 's/#5e72e4/#31A1A1/g; s/#483d8b/#31A1A1/g' {} \;
 find ./ -name "dark.less" -exec sed -i 's/#5e72e4/#31A1A1/g; s/#483d8b/#31A1A1/g' {} \;
 
-#修改ttyd为免密
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_ttyd-nopass.sh" "package/base-files/files/etc/uci-defaults/99_ttyd-nopass"
-
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_set_argon_primary" "package/base-files/files/etc/uci-defaults/99_set_argon_primary"
 
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99-distfeeds.conf" "package/emortal/default-settings/files/99-distfeeds.conf"
@@ -304,13 +344,10 @@ sed -i "/exit 0/i\\
 [ -f \'/etc/99-distfeeds.conf\' ] && mv \'/etc/99-distfeeds.conf\' \'/etc/opkg/distfeeds.conf\'\n\
 sed -ri \'/check_signature/s@^[^#]@#&@\' /etc/opkg.conf\n" "package/emortal/default-settings/files/99-default-settings"
 
-#解决 dropbear 配置的 bug
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_dropbear_setup.sh" "package/base-files/files/etc/uci-defaults/99_dropbear_setup"
-
 
 find ./ -name "getifaddr.c" -exec sed -i 's/return 1;/return 0;/g' {} \;
 
-#fix makefile for apk
 if [ -f ./package/v2ray-geodata/Makefile ]; then
     sed -i 's/VER)-\$(PKG_RELEASE)/VER)-r\$(PKG_RELEASE)/g' ./package/v2ray-geodata/Makefile
 fi
@@ -333,8 +370,6 @@ if [ -f ./package/luci-app-ddns-go/ddns-go/file/ddns-go.init ]; then
     echo "ddns-go.init has been replaced successfully."
 fi
 
-
-#修复 rust 编译
 RUST_FILE=$(find ./feeds/packages/ -maxdepth 3 -type f -wholename "*/rust/Makefile")
 if [ -f "$RUST_FILE" ]; then
     echo " "
@@ -407,7 +442,6 @@ fi
 echo "All Docker compilation fixes applied successfully!"
 
 
-#fix cmake minimum version issue
 if ! grep -q "CMAKE_POLICY_VERSION_MINIMUM" include/cmake.mk; then
     echo 'CMAKE_OPTIONS += -DCMAKE_POLICY_VERSION_MINIMUM=3.5' >> include/cmake.mk
 fi
