@@ -83,6 +83,7 @@ UPDATE_PACKAGE "luci-app-bandix" "timsaya/luci-app-bandix" "main"
 WRT_IP="192.168.1.1"
 WRT_NAME="FWRT"
 WRT_WIFI="FWRT"
+
 #修改immortalwrt.lan关联IP
 sed -i "s/192\.168\.[0-9]*\.[0-9]*/$WRT_IP/g" $(find ./feeds/luci/modules/luci-mod-system/ -type f -name "flash.js")
 
@@ -117,7 +118,7 @@ sed -i "/^CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_/{
 
 keywords_to_delete=(
     "uugamebooster" "luci-app-wol" "luci-i18n-wol-zh-cn" "CONFIG_TARGET_INITRAMFS" "ddns" "luci-app-advancedplus" "mihomo" "nikki"
-    "smartdns" "kucat" "bootstrap" "kucat" "luci-app-partexp" "luci-app-upnp"
+    "smartdns" "kucat" "bootstrap" "luci-app-partexp" "luci-app-upnp"
 )
 
 [[ $WRT_CONFIG == *"WIFI-NO"* ]] && keywords_to_delete+=("usb" "wpad" "hostapd")
@@ -169,7 +170,7 @@ provided_config_lines=(
 )
 
 if [[ $WRT_CONFIG == *"WIFI-NO"* ]]; then
-  provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n")
+    provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n")
 fi
 
 if [[ "$WRT_CONFIG" != *"EMMC"* && "$WRT_CONFIG" == *"WIFI-NO"* ]]; then
@@ -227,10 +228,10 @@ for line in "${provided_config_lines[@]}"; do
 done
 
 # =======================================================
-# [pkg-fix] 替换 Makefile 中的 kmod-iptables 依赖为 kmod-nf-ipt
+# [pkg-fix] 替换 Makefile 中的 kmod-iptables 直接依赖为 kmod-nf-ipt
 # =======================================================
 echo "================================================================"
-echo "[pkg-fix] 替换 Makefile 中的 kmod-iptables 依赖为 kmod-nf-ipt"
+echo "[pkg-fix] 替换 Makefile 中的 +kmod-iptables 依赖为 +kmod-nf-ipt"
 
 _affected=$(grep -rl "+kmod-iptables" package/ feeds/ 2>/dev/null || true)
 if [ -n "$_affected" ]; then
@@ -250,6 +251,37 @@ fi
 
 sed -i '/^CONFIG_PACKAGE_kmod-iptables=/d' .config
 echo '# CONFIG_PACKAGE_kmod-iptables is not set' >> .config
+echo "================================================================"
+
+# =======================================================
+# [pkg-fix-2] 替换 Makefile 中 +iptables 间接依赖为 +iptables-nft
+# 修复链路：sqm-scripts-nss/passwall 等 -> +iptables -> kmod-iptables
+# 精确匹配：不误伤 +iptables-mod-* / +iptables-nft / +ip6tables
+# =======================================================
+echo "================================================================"
+echo "[pkg-fix-2] 替换 Makefile 中的 +iptables 间接依赖为 +iptables-nft"
+
+_affected2=$(grep -rlE '\+iptables([^-a-zA-Z0-9_]|$)' package/ feeds/ 2>/dev/null \
+    | xargs grep -lv 'PKG_NAME:=iptables' 2>/dev/null || true)
+
+if [ -n "$_affected2" ]; then
+    _total2=$(echo "$_affected2" | wc -l)
+    echo "[pkg-fix-2] 发现 $_total2 个 Makefile 依赖 +iptables，前 15 个:"
+    echo "$_affected2" | head -15 | sed 's/^/  - /'
+
+    while IFS= read -r _mk; do
+        sed -i -E 's/\+iptables([^-a-zA-Z0-9_]|$)/+iptables-nft\1/g' "$_mk"
+    done <<< "$_affected2"
+
+    _remain2=$(grep -rlE '\+iptables([^-a-zA-Z0-9_]|$)' package/ feeds/ 2>/dev/null \
+        | xargs grep -lv 'PKG_NAME:=iptables' 2>/dev/null | wc -l)
+    echo "[pkg-fix-2] 替换完成，残留 $_remain2 处 (应为 0)"
+else
+    echo "[pkg-fix-2] 没有 Makefile 依赖 +iptables (已是干净状态)"
+fi
+
+sed -i '/^CONFIG_PACKAGE_iptables=/d' .config
+echo '# CONFIG_PACKAGE_iptables is not set' >> .config
 echo "================================================================"
 
 
@@ -411,4 +443,3 @@ while IFS= read -r -d '' cfg; do
 done < <(find target/linux/generic/ target/linux/qualcommax/ -name "config-*" -print0 2>/dev/null)
 
 echo "[kernel-fix] 完成。"
-
