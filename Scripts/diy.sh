@@ -132,51 +132,6 @@ sed -i "/^CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_/{
     /$keep_pattern/!d
 }" ./.config
 
-# ===================================================================
-# 修复 Linux 6.18+ 新增 Kconfig 选项导致 syncconfig 报错（打地鼠版）
-# ===================================================================
-# 实际用到的 config 文件（从构建日志的 kconfig.pl 调用得知）：
-#   - target/linux/generic/config-6.18
-#   - target/linux/qualcommax/config-6.18
-#   - target/linux/qualcommax/ipq60xx/config-default
-# 每次构建发现新的 (NEW) 选项就追加到 NEW_OPTS 数组里。
-NEW_OPTS=(
-    PERSISTENT_HUGE_ZERO_FOLIO   # 上一轮修好
-    NO_PAGE_MAPCOUNT              # 本轮新冒出来的
-)
-
-echo "================================================================"
-echo "[kernel-fix] 待处理选项: ${NEW_OPTS[*]}"
-if [ -d "target/linux/qualcommax/" ]; then
-    echo "[kernel-fix] qualcommax/ 内容:"
-    ls -1 target/linux/qualcommax/ 2>/dev/null
-else
-    echo "[kernel-fix] ##[error] target/linux/qualcommax/ 不存在！"
-fi
-
-# 注意：除了 qualcommax/，generic/config-6.18 也是 kconfig.pl 的输入，
-# 所以也要扫描进去，避免遗漏
-_files=0
-_writes=0
-while IFS= read -r -d '' _cfg; do
-    _files=$((_files + 1))
-    for _opt in "${NEW_OPTS[@]}"; do
-        if grep -q "CONFIG_${_opt}" "$_cfg"; then
-            echo "[kernel-fix] 已存在 CONFIG_${_opt}，跳过: $_cfg"
-        else
-            echo "# CONFIG_${_opt} is not set" >> "$_cfg"
-            _writes=$((_writes + 1))
-            echo "[kernel-fix] 已写入 CONFIG_${_opt} -> $_cfg"
-        fi
-    done
-done < <(find target/linux/generic target/linux/qualcommax \
-            -type f \( -name "config-*" -o -name "config-default" \) \
-            -print0 2>/dev/null)
-
-echo "[kernel-fix] 完成: 扫描 $_files 个文件，写入 $_writes 条"
-[ "$_files" -eq 0 ] && echo "[kernel-fix] ##[error] 没找到任何 config 片段文件！"
-echo "================================================================"
-
 
 keywords_to_delete=(
     #"xiaomi_ax3600" "xiaomi_ax9000" "xiaomi_ax1800" "glinet" "jdcloud_ax6600" "linksys" "link_nn6600" "re-cs-02" "nn6600" "mr7350"
@@ -261,12 +216,7 @@ fi
     "CONFIG_PACKAGE_luci-i18n-openlist2-zh-cn=y"
     #"CONFIG_PACKAGE_fdisk=y"
     #"CONFIG_PACKAGE_parted=y"
-    "CONFIG_PACKAGE_iptables-mod-extra=y"
     "CONFIG_PACKAGE_ip6tables-nft=y"
-    "CONFIG_PACKAGE_ip6tables-mod-fullconenat=y"
-    "CONFIG_PACKAGE_iptables-mod-fullconenat=y"
-    "CONFIG_PACKAGE_libip4tc=y"
-    "CONFIG_PACKAGE_libip6tc=y"
     "CONFIG_PACKAGE_luci-app-passwall=y"
     "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y"
     "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Server=y"
@@ -286,14 +236,7 @@ fi
     #"CONFIG_PACKAGE_usbutils=y"
     "CONFIG_PACKAGE_default-settings=y"
     "CONFIG_PACKAGE_default-settings-chn=y"
-    "CONFIG_PACKAGE_iptables-mod-conntrack-extra=y"
     "CONFIG_PACKAGE_kmod-br-netfilter=y"
-    "CONFIG_PACKAGE_kmod-ip6tables=y"
-    "CONFIG_PACKAGE_kmod-ipt-conntrack=y"
-    "CONFIG_PACKAGE_kmod-ipt-extra=y"
-    "CONFIG_PACKAGE_kmod-ipt-nat=y"
-    "CONFIG_PACKAGE_kmod-ipt-nat6=y"
-    "CONFIG_PACKAGE_kmod-ipt-physdev=y"
     "CONFIG_PACKAGE_kmod-nf-ipt6=y"
     "CONFIG_PACKAGE_kmod-nf-ipvs=y"
     "CONFIG_PACKAGE_kmod-nf-nat6=y"
@@ -324,6 +267,39 @@ fi
 for line in "${provided_config_lines[@]}"; do
     echo "$line" >> .config
 done
+
+# ===================================================================
+# 兜底：替换 Makefile 里的 +kmod-iptables 为 +kmod-nf-ipt
+# ===================================================================
+# 即使我们删了 .config 里所有显式的 iptables 选择，kenzok8/jell 仓库
+# 里的 passwall / openclash / mihomo 等 Makefile 可能还在写
+# DEPENDS:=+kmod-iptables，会被 make defconfig 自动拉回来，重新触发
+# 与 kmod-nf-ipt 的文件冲突。
+# 此处直接改源头：把所有 Makefile 中的 +kmod-iptables 依赖改为 +kmod-nf-ipt
+echo "================================================================"
+echo "[pkg-fix] 替换 Makefile 中的 kmod-iptables 依赖为 kmod-nf-ipt"
+
+_affected=$(grep -rl "+kmod-iptables" package/ feeds/ 2>/dev/null || true)
+if [ -n "$_affected" ]; then
+    _total=$(echo "$_affected" | wc -l)
+    echo "[pkg-fix] 发现 $_total 个 Makefile 依赖 kmod-iptables，前 15 个:"
+    echo "$_affected" | head -15 | sed 's/^/  - /'
+
+    # 用单词边界正则替换，绝不误伤 kmod-iptables-mod-* 等其他包
+    while IFS= read -r _mk; do
+        sed -i -E 's/\+kmod-iptables([^a-zA-Z0-9_-]|$)/+kmod-nf-ipt\1/g' "$_mk"
+    done <<< "$_affected"
+
+    _remain=$(grep -rlE "\+kmod-iptables([^a-zA-Z0-9_-]|$)" package/ feeds/ 2>/dev/null | wc -l)
+    echo "[pkg-fix] 替换完成，残留 $_remain 处 (应为 0)"
+else
+    echo "[pkg-fix] 没有 Makefile 依赖 kmod-iptables (已是干净状态)"
+fi
+
+# .config 兜底：万一有 .config 里残留 kmod-iptables=y 也强制禁掉
+sed -i '/^CONFIG_PACKAGE_kmod-iptables=/d' .config
+echo '# CONFIG_PACKAGE_kmod-iptables is not set' >> .config
+echo "================================================================"
 
 
 #./scripts/feeds update -a
