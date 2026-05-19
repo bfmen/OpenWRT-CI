@@ -118,7 +118,9 @@ jobs:
         uses: actions/cache@main
         with:
           key: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_HASH}}
-          restore-keys: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}
+          restore-keys: |
+            ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}
+            ${{contains(env.WRT_CONFIG, 'EMMC-WIFI-YES') && 'IPQ60XX-EMMC-WIFI-NO' || env.WRT_CONFIG}}-${{env.WRT_INFO}}
           path: |
             ./wrt/.ccache
             ./wrt/staging_dir/host*
