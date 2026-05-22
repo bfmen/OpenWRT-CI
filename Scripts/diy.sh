@@ -418,12 +418,32 @@ fi
 # =======================================================
 # 修复 Docker 引擎 (dockerd) 和 CLI (docker)
 # =======================================================
-DOCKER_VER="29.2.1"
-DOCKERD_COMMIT="4042ac6"
-DOCKER_CLI_COMMIT="33a5c92"
+echo "Fetching latest Docker version..."
+_MOBY_TAG=$(curl -sf https://api.github.com/repos/moby/moby/releases/latest | \
+    python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+DOCKER_VER=$(echo "$_MOBY_TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
 
-dockerd_makefile=$(find package/ feeds/ -name Makefile | xargs grep -l "PKG_NAME:=dockerd" | head -n 1)
-docker_makefile=$(find package/ feeds/ -name Makefile | xargs grep -l "PKG_NAME:=docker" | head -n 1)
+if [ -z "$DOCKER_VER" ]; then
+    echo "警告: 无法获取 Docker 最新版本，回退到 29.5.2"
+    DOCKER_VER="29.5.2"
+    DOCKERD_COMMIT="568f755"
+    DOCKER_CLI_COMMIT="79eb04c"
+else
+    echo "Latest Docker version: $DOCKER_VER (tag: $_MOBY_TAG)"
+    DOCKERD_COMMIT=$(curl -sf "https://api.github.com/repos/moby/moby/commits?sha=${_MOBY_TAG}&per_page=1" | \
+        python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['sha'][:7] if isinstance(d,list) and d else '')")
+    DOCKER_CLI_COMMIT=$(curl -sf "https://api.github.com/repos/docker/cli/commits?sha=v${DOCKER_VER}&per_page=1" | \
+        python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['sha'][:7] if isinstance(d,list) and d else '')")
+    if [ -z "$DOCKERD_COMMIT" ] || [ -z "$DOCKER_CLI_COMMIT" ]; then
+        echo "警告: 无法获取 commit hash，回退到已知值"
+        DOCKERD_COMMIT="568f755"
+        DOCKER_CLI_COMMIT="79eb04c"
+    fi
+fi
+echo "Docker: $DOCKER_VER | dockerd: $DOCKERD_COMMIT | cli: $DOCKER_CLI_COMMIT"
+
+dockerd_makefile=$(find package/ feeds/ -name Makefile | xargs grep -lE "^PKG_NAME:=dockerd$" | head -n 1)
+docker_makefile=$(find package/ feeds/ -name Makefile | xargs grep -lE "^PKG_NAME:=docker$" | head -n 1)
 
 if [ -f "$dockerd_makefile" ]; then
     echo "Processing dockerd Makefile at: $dockerd_makefile"
