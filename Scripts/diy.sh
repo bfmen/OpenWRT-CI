@@ -28,13 +28,19 @@ define Device/sx_7981r128
   DEVICE_DTS := mt7981b-sx-7981r128
   DEVICE_DTS_DIR := ../dts
   DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware kmod-usb3
+  # 兼容 hanwckf 老固件的 board name，允许从老固件直接 sysupgrade 过来
+  SUPPORTED_DEVICES := mediatek,mt7981-spim-snand-7981r128
   UBINIZE_OPTS := -E 5
   BLOCKSIZE := 128k
   PAGESIZE := 2048
-  IMAGE_SIZE := 114688k
+  IMAGE_SIZE := 102400k
   KERNEL_IN_UBI := 1
   UBOOTENV_IN_UBI := 1
-  IMAGES := sysupgrade.itb
+  # factory.bin    = 裸 UBI 镜像，U-Boot 下可直接 nand write 刷写
+  # sysupgrade.itb = FIT 格式，OpenWrt 系统内 sysupgrade 升级用
+  # recovery.itb   = initramfs，用于 U-Boot 的 bootm 救砖
+  IMAGES += factory.bin sysupgrade.itb
+  IMAGE/factory.bin := append-ubi | check-size $$(IMAGE_SIZE)
   KERNEL_INITRAMFS_SUFFIX := -recovery.itb
   KERNEL := kernel-bin | gzip
   KERNEL_INITRAMFS := kernel-bin | lzma | \
