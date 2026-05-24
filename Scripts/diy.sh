@@ -1,5 +1,58 @@
 #!/bin/bash
 
+# =======================================================
+# [device-add] 注入 SX 7981R128 设备支持
+# 该设备不在 VIKINGYFY/immortalwrt 源码中，需要本 CI 注入
+# - DTS：Scripts/dts/mt7981b-sx-7981r128.dts
+# - 设备条目：追加到 target/linux/mediatek/image/filogic.mk
+# - 仅 MTK 平台需要，其他平台（IPQ60XX/IPQ807X/Rockchip/x86）无影响
+# =======================================================
+SX7981_DTS_SRC="${GITHUB_WORKSPACE}/Scripts/dts/mt7981b-sx-7981r128.dts"
+SX7981_FILOGIC_MK="target/linux/mediatek/image/filogic.mk"
+
+if [ -f "$SX7981_DTS_SRC" ] && [ -d "target/linux/mediatek/dts" ]; then
+    echo "================================================================"
+    echo "[device-add] 注入 SX 7981R128 设备支持..."
+
+    # 1. 复制 DTS
+    cp -f "$SX7981_DTS_SRC" target/linux/mediatek/dts/
+    echo "[device-add]   DTS 已复制到 target/linux/mediatek/dts/"
+
+    # 2. 追加设备到 filogic.mk（幂等：已存在则跳过）
+    if [ -f "$SX7981_FILOGIC_MK" ] && ! grep -q '^define Device/sx_7981r128' "$SX7981_FILOGIC_MK"; then
+        cat >> "$SX7981_FILOGIC_MK" << 'FILOGIC_EOF'
+
+define Device/sx_7981r128
+  DEVICE_VENDOR := SX
+  DEVICE_MODEL := 7981R128
+  DEVICE_DTS := mt7981b-sx-7981r128
+  DEVICE_DTS_DIR := ../dts
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware kmod-usb3
+  UBINIZE_OPTS := -E 5
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  IMAGE_SIZE := 114688k
+  KERNEL_IN_UBI := 1
+  UBOOTENV_IN_UBI := 1
+  IMAGES := sysupgrade.itb
+  KERNEL_INITRAMFS_SUFFIX := -recovery.itb
+  KERNEL := kernel-bin | gzip
+  KERNEL_INITRAMFS := kernel-bin | lzma | \
+        fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
+  IMAGE/sysupgrade.itb := append-kernel | \
+        fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-static-with-rootfs | \
+        append-metadata
+endef
+TARGET_DEVICES += sx_7981r128
+FILOGIC_EOF
+        echo "[device-add]   设备条目已追加到 filogic.mk"
+    else
+        echo "[device-add]   设备条目已存在，跳过追加"
+    fi
+    echo "[device-add] 完成"
+    echo "================================================================"
+fi
+
 #安装和更新软件包
 UPDATE_PACKAGE() {
 	local PKG_NAME=$1
