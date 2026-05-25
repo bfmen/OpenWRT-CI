@@ -183,7 +183,7 @@ sed -i "/^CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_/{
 # 里的设备一律从 .config 删掉，避免无意义编译。
 # 想多编几个设备就往 mtk_keep 里加（用 \| 分隔），名字对应
 # Config/MEDIATEK-WIFI-*.txt 里 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_xxx 的 xxx。
-mtk_keep="\(sx_7981r128\)=y$"
+mtk_keep="\(sx_7981r128\|nokia_ea0326gmp\|cmcc_rax3000m\)=y$"
 
 sed -i "/^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_/{
     /$mtk_keep/!d
