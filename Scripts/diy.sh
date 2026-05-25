@@ -179,6 +179,17 @@ sed -i "/^CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_/{
 }" ./.config
 
 
+# MTK 设备白名单——只保留这里列出的设备，其他 MEDIATEK-WIFI-{YES,NO}.txt
+# 里的设备一律从 .config 删掉，避免无意义编译。
+# 想多编几个设备就往 mtk_keep 里加（用 \| 分隔），名字对应
+# Config/MEDIATEK-WIFI-*.txt 里 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_xxx 的 xxx。
+mtk_keep="\(sx_7981r128\)=y$"
+
+sed -i "/^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_/{
+    /$mtk_keep/!d
+}" ./.config
+
+
 keywords_to_delete=(
     "uugamebooster" "luci-app-wol" "luci-i18n-wol-zh-cn" "CONFIG_TARGET_INITRAMFS" "ddns" "luci-app-advancedplus" "mihomo" "nikki"
     "smartdns" "kucat" "bootstrap" "luci-app-partexp" "luci-app-upnp"
