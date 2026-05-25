@@ -1,6 +1,21 @@
 #!/bin/bash
 
 # =======================================================
+# [upstream-fix] 删除上游 immortalwrt 格式损坏的 globitel-bt-r320 patch
+# 该 patch (immortalwrt commit a3105d3f, 2026-05-07) 在 line 162/218 处
+# 相邻多个 `--- /dev/null` 块之间缺 `diff --git` file-boundary header，
+# 用 patch(1) plaintext 模式 apply 时报 "malformed patch at line 162"，
+# 导致所有 MT7981 u-boot variant (abt_asr3000 / sx_7981r128 等) 编译失败。
+# 我们不用 globitel-bt-r320 设备，直接删除该 patch。
+# 上游修复后此 hook 会自然 no-op（文件不存在则跳过）。
+# =======================================================
+BROKEN_UBOOT_PATCH="package/boot/uboot-mediatek/patches/472-add-globitel-bt-r320.patch"
+if [ -f "$BROKEN_UBOOT_PATCH" ]; then
+    echo "[upstream-fix] 删除格式损坏的 $BROKEN_UBOOT_PATCH"
+    rm -f "$BROKEN_UBOOT_PATCH"
+fi
+
+# =======================================================
 # [device-add] 注入 SX 7981R128 设备支持
 # 该设备不在 VIKINGYFY/immortalwrt 源码中，需要本 CI 注入
 # - DTS：Scripts/dts/mt7981b-sx-7981r128.dts
