@@ -28,26 +28,22 @@ define Device/sx_7981r128
   DEVICE_DTS := mt7981b-sx-7981r128
   DEVICE_DTS_DIR := ../dts
   DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware kmod-usb3
-  # 兼容 hanwckf 老固件的 board name，允许从老固件直接 sysupgrade 过来
-  SUPPORTED_DEVICES := mediatek,mt7981-spim-snand-7981r128
-  UBINIZE_OPTS := -E 5
-  BLOCKSIZE := 128k
-  PAGESIZE := 2048
-  IMAGE_SIZE := 102400k
+  # 第一项 = 新 DTS 的 compatible 第一字段（运行时 board_name）
+  # 第二项 = hanwckf 老固件 board name，允许从老固件直接 sysupgrade 过来
+  SUPPORTED_DEVICES := sx,7981r128 mediatek,mt7981-spim-snand-7981r128
   KERNEL_IN_UBI := 1
   UBOOTENV_IN_UBI := 1
-  # factory.bin    = 裸 UBI 镜像，U-Boot 下可直接 nand write 刷写
-  # sysupgrade.itb = FIT 格式，OpenWrt 系统内 sysupgrade 升级用
-  # recovery.itb   = initramfs，用于 U-Boot 的 bootm 救砖
-  IMAGES += factory.bin sysupgrade.itb
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  IMAGE_SIZE := 65536k
+  UBINIZE_OPTS := -E 5
+  # factory.bin    = 裸 UBI 镜像（magic UBI#），由 U-Boot 写入 ubi 分区
+  # sysupgrade.bin = sysupgrade-tar（OpenWrt 通用升级包），
+  #                  既能在 OpenWrt 系统内 sysupgrade 升级，
+  #                  也能被 hanwckf 改的 U-Boot HTTP recovery 接受
+  IMAGES := sysupgrade.bin factory.bin
   IMAGE/factory.bin := append-ubi | check-size $$(IMAGE_SIZE)
-  KERNEL_INITRAMFS_SUFFIX := -recovery.itb
-  KERNEL := kernel-bin | gzip
-  KERNEL_INITRAMFS := kernel-bin | lzma | \
-        fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
-  IMAGE/sysupgrade.itb := append-kernel | \
-        fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-static-with-rootfs | \
-        append-metadata
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
 endef
 TARGET_DEVICES += sx_7981r128
 FILOGIC_EOF
