@@ -4,8 +4,10 @@
 name: Auto-Clean
 
 on:
+  #自动清理：每天早上5点
   schedule:
     - cron: '0 21 * * *'
+  #手动清理
   workflow_dispatch:
     inputs:
       keep_per_config:
@@ -32,9 +34,16 @@ jobs:
 
           result = subprocess.run(
               ['gh', 'release', 'list', '--limit', '300', '--json', 'tagName,createdAt'],
-              capture_output=True, text=True, check=True
+              capture_output=True, text=True
           )
+          if result.returncode != 0 or not result.stdout.strip():
+              print("没有找到任何 Release，跳过清理")
+              exit(0)
+
           releases = json.loads(result.stdout)
+          if not releases:
+              print("Release 列表为空，跳过清理")
+              exit(0)
 
           groups = defaultdict(list)
           for r in releases:
@@ -45,31 +54,31 @@ jobs:
 
           to_delete = []
           for config, items in sorted(groups.items()):
-              items.sort(key=lambda x: x[0], reverse=True)  # 最新在前
+              items.sort(key=lambda x: x[0], reverse=True)
               kept = [t for _, t in items[:keep_n]]
               old  = [t for _, t in items[keep_n:]]
               print(f"\n[{config}]")
-              print(f"  ✅ 保留: {kept}")
+              print(f"  保留: {kept}")
               if old:
-                  print(f"  🗑  删除: {old}")
+                  print(f"  删除: {old}")
               to_delete.extend(old)
 
           print(f"\n共删除 {len(to_delete)} 个 Release\n")
           for tag in to_delete:
-              print(f"→ 删除 {tag}")
+              print(f"-> 删除 {tag}")
               subprocess.run(
                   ['gh', 'release', 'delete', tag, '--yes', '--cleanup-tag'],
                   check=True
               )
-          print("✅ Release 清理完成")
+          print("Release 清理完成")
           EOF
 
-      - name: Delete completed Workflow Runs
+      - name: Delete Workflow Runs (skip running)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "清理已完成的 Workflow Runs..."
+          echo "清理 Workflow Runs（跳过运行中）..."
           gh run list --limit 500 --json databaseId,status \
             | jq -r '.[] | select(.status == "completed") | .databaseId' \
             | xargs -r -I{} gh run delete {} --yes
-          echo "✅ Workflow Runs 清理完成"
+          echo "Workflow Runs 清理完成"
