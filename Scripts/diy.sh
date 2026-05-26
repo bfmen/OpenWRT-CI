@@ -52,12 +52,10 @@ define Device/sx_7981r128
   PAGESIZE := 2048
   IMAGE_SIZE := 65536k
   UBINIZE_OPTS := -E 5
-  # factory.bin    = 裸 UBI 镜像（magic UBI#），由 U-Boot 写入 ubi 分区
   # sysupgrade.bin = sysupgrade-tar（OpenWrt 通用升级包），
   #                  既能在 OpenWrt 系统内 sysupgrade 升级，
   #                  也能被 hanwckf 改的 U-Boot HTTP recovery 接受
-  IMAGES := sysupgrade.bin factory.bin
-  IMAGE/factory.bin := append-ubi | check-size $$(IMAGE_SIZE)
+  IMAGES := sysupgrade.bin
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
 endef
 TARGET_DEVICES += sx_7981r128
