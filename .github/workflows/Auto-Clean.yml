@@ -86,5 +86,5 @@ jobs:
           echo "清理 Workflow Runs（跳过运行中）..."
           gh run list --repo "$REPO" --limit 500 --json databaseId,status \
             | jq -r '.[] | select(.status == "completed") | .databaseId' \
-            | xargs -r -I{} gh run delete --repo "$REPO" {} --yes
+            | xargs -r -I{} gh run delete --repo "$REPO" {}
           echo "Workflow Runs 清理完成"
