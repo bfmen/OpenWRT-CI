@@ -25,25 +25,30 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           KEEP_N: ${{ inputs.keep_per_config || '1' }}
+          REPO: ${{ github.repository }}
         run: |
           python3 << 'EOF'
-          import json, re, subprocess, os
+          import json, re, subprocess, os, sys
           from collections import defaultdict
 
           keep_n = int(os.environ.get('KEEP_N', '1'))
+          repo   = os.environ.get('REPO', '')
 
           result = subprocess.run(
-              ['gh', 'release', 'list', '--limit', '300', '--json', 'tagName,createdAt'],
+              ['gh', 'release', 'list', '--repo', repo, '--limit', '300', '--json', 'tagName,createdAt'],
               capture_output=True, text=True
           )
-          if result.returncode != 0 or not result.stdout.strip():
+          if result.stderr:
+              print(f"[gh stderr] {result.stderr.strip()}", file=sys.stderr)
+          if result.returncode != 0:
+              print(f"gh release list 失败 (exit {result.returncode})，退出")
+              sys.exit(1)
+          if not result.stdout.strip() or result.stdout.strip() == '[]':
               print("没有找到任何 Release，跳过清理")
-              exit(0)
+              sys.exit(0)
 
           releases = json.loads(result.stdout)
-          if not releases:
-              print("Release 列表为空，跳过清理")
-              exit(0)
+          print(f"找到 {len(releases)} 个 Release")
 
           groups = defaultdict(list)
           for r in releases:
@@ -67,7 +72,7 @@ jobs:
           for tag in to_delete:
               print(f"-> 删除 {tag}")
               subprocess.run(
-                  ['gh', 'release', 'delete', tag, '--yes', '--cleanup-tag'],
+                  ['gh', 'release', 'delete', '--repo', repo, tag, '--yes', '--cleanup-tag'],
                   check=True
               )
           print("Release 清理完成")
@@ -76,9 +81,10 @@ jobs:
       - name: Delete Workflow Runs (skip running)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
           echo "清理 Workflow Runs（跳过运行中）..."
-          gh run list --limit 500 --json databaseId,status \
+          gh run list --repo "$REPO" --limit 500 --json databaseId,status \
             | jq -r '.[] | select(.status == "completed") | .databaseId' \
-            | xargs -r -I{} gh run delete {} --yes
+            | xargs -r -I{} gh run delete --repo "$REPO" {} --yes
           echo "Workflow Runs 清理完成"
