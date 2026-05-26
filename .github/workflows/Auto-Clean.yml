@@ -4,11 +4,14 @@
 name: Auto-Clean
 
 on:
-  #自动清理：每天早上5点
   schedule:
-    - cron: 0 21 * * *
-  #手动清理
+    - cron: '0 21 * * *'
   workflow_dispatch:
+    inputs:
+      keep_per_config:
+        description: '每个 CONFIG 保留最新版本数（默认 1）'
+        default: '1'
+        required: false
 
 permissions: write-all
 
@@ -16,12 +19,57 @@ jobs:
   auto_clean:
     runs-on: ubuntu-latest
     steps:
-      - name: Delete old Releases and Workflows
-        uses: ophub/delete-releases-workflows@main
-        with:
-          gh_token: ${{secrets.GITHUB_TOKEN}}
-          delete_releases: true
-          releases_keep_latest: 0
-          delete_tags: true
-          delete_workflows: true
-          workflows_keep_day: 0
+      - name: Delete old Releases (keep latest per CONFIG)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEEP_N: ${{ inputs.keep_per_config || '1' }}
+        run: |
+          python3 << 'EOF'
+          import json, re, subprocess, os
+          from collections import defaultdict
+
+          keep_n = int(os.environ.get('KEEP_N', '1'))
+
+          result = subprocess.run(
+              ['gh', 'release', 'list', '--limit', '300', '--json', 'tagName,createdAt'],
+              capture_output=True, text=True, check=True
+          )
+          releases = json.loads(result.stdout)
+
+          groups = defaultdict(list)
+          for r in releases:
+              tag = r['tagName']
+              # CONFIG = 去掉末尾的 -YY.MM.DD-HH.MM.SS
+              config = re.sub(r'-\d{2}\.\d{2}\.\d{2}-\d{2}\.\d{2}\.\d{2}$', '', tag)
+              groups[config].append((r['createdAt'], tag))
+
+          to_delete = []
+          for config, items in sorted(groups.items()):
+              items.sort(key=lambda x: x[0], reverse=True)  # 最新在前
+              kept = [t for _, t in items[:keep_n]]
+              old  = [t for _, t in items[keep_n:]]
+              print(f"\n[{config}]")
+              print(f"  ✅ 保留: {kept}")
+              if old:
+                  print(f"  🗑  删除: {old}")
+              to_delete.extend(old)
+
+          print(f"\n共删除 {len(to_delete)} 个 Release\n")
+          for tag in to_delete:
+              print(f"→ 删除 {tag}")
+              subprocess.run(
+                  ['gh', 'release', 'delete', tag, '--yes', '--cleanup-tag'],
+                  check=True
+              )
+          print("✅ Release 清理完成")
+          EOF
+
+      - name: Delete completed Workflow Runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "清理已完成的 Workflow Runs..."
+          gh run list --limit 500 --json databaseId,status \
+            | jq -r '.[] | select(.status == "completed") | .databaseId' \
+            | xargs -r -I{} gh run delete {} --yes
+          echo "✅ Workflow Runs 清理完成"
