@@ -97,7 +97,11 @@ uci set wireless.radio0.disabled=0
 uci set wireless.radio1.disabled=0
 uci commit wireless
 
-# --- 网络：添加 wan2（SFP 笼，eth1，IPv4+IPv6）---
+# --- 网络：wan6（2.5G 主WAN，lan2，IPv6）+ wan2/wan2_6（SFP 笼，eth1）---
+# wan6 不由 ucidef_set_interfaces_lan_wan 自动创建，需手动补上
+uci set network.wan6=interface
+uci set network.wan6.device=lan2
+uci set network.wan6.proto=dhcpv6
 uci set network.wan2=interface
 uci set network.wan2.device=eth1
 uci set network.wan2.proto=dhcp
