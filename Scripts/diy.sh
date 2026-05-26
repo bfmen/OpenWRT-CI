@@ -127,6 +127,16 @@ if [ -n "$wan_zone_idx" ]; then
     uci commit firewall
 fi
 
+# --- LED：green:lan (GPIO 8) 绑定到 2.5G 物理口 lan2 ---
+# 实机点灯测试确认：green:lan 这颗物理 LED 位于 2.5G 网口旁
+uci add system led
+uci set system.@led[-1].name='led_lan2'
+uci set system.@led[-1].sysfs='green:lan'
+uci set system.@led[-1].trigger='netdev'
+uci set system.@led[-1].dev='lan2'
+uci set system.@led[-1].mode='link tx rx'
+uci commit system
+
 exit 0
 UCI_EOF
     chmod +x package/base-files/files/etc/uci-defaults/98_sx_7981r128_init.sh
