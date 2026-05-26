@@ -654,3 +654,32 @@ while IFS= read -r -d '' cfg; do
 done < <(find target/linux/generic/ target/linux/qualcommax/ -name "config-*" -print0 2>/dev/null)
 
 echo "[kernel-fix] 完成。"
+
+# =======================================================
+# [dae] DAE 构建专项处理
+# 仅当 WRT_CONFIG 含 "DAE" 时执行，不影响其他任何构建
+# =======================================================
+if [[ "$WRT_CONFIG" == *"DAE"* ]]; then
+    echo "================================================================"
+    echo "[dae] 开始 DAE 构建专项配置..."
+
+    # 1. 移除 openclash 和 passwall（dae 是唯一透明代理，避免冲突）
+    sed -i '/openclash/d; /passwall/d' .config
+    echo "[dae] 已从 .config 移除 openclash / passwall 相关行"
+
+    # 2. 扩大 eMMC 设备内核分区
+    #    dae 包含 eBPF 字节码，编译产物比普通代理大，默认 6144k 不够
+    image_file='./target/linux/qualcommax/image/ipq60xx.mk'
+    if [ -f "$image_file" ]; then
+        sed -i "/^define Device\/emmc-common/,/^endef/ s/KERNEL_SIZE := 6144k/KERNEL_SIZE := 12288k/" "$image_file"
+        sed -i "/^define Device\/jdcloud_re-ss-01/,/^endef/ { /KERNEL_SIZE := 6144k/s//KERNEL_SIZE := 12288k/ }" "$image_file"
+        sed -i "/^define Device\/jdcloud_re-cs-02/,/^endef/ { /KERNEL_SIZE := 6144k/s//KERNEL_SIZE := 12288k/ }" "$image_file"
+        sed -i "/^define Device\/jdcloud_re-cs-07/,/^endef/ { /KERNEL_SIZE := 6144k/s//KERNEL_SIZE := 12288k/ }" "$image_file"
+        sed -i "/^define Device\/link_nn6000-common/,/^endef/ { /KERNEL_SIZE := 6144k/s//KERNEL_SIZE := 12288k/ }" "$image_file"
+        sed -i "/^define Device\/linksys_mr/,/^endef/ { /KERNEL_SIZE := 8192k/s//KERNEL_SIZE := 12288k/ }" "$image_file"
+        echo "[dae] eMMC 内核分区已扩大至 12288k"
+    fi
+
+    echo "[dae] DAE 构建专项配置完成"
+    echo "================================================================"
+fi
