@@ -97,10 +97,13 @@ uci set wireless.radio0.disabled=0
 uci set wireless.radio1.disabled=0
 uci commit wireless
 
-# --- 网络：添加 wan2（SFP 笼，eth1）---
+# --- 网络：添加 wan2（SFP 笼，eth1，IPv4+IPv6）---
 uci set network.wan2=interface
 uci set network.wan2.device=eth1
 uci set network.wan2.proto=dhcp
+uci set network.wan2_6=interface
+uci set network.wan2_6.device=eth1
+uci set network.wan2_6.proto=dhcpv6
 uci commit network
 
 # --- 防火墙：将 wan2 加入 WAN zone ---
@@ -115,6 +118,7 @@ while uci get "firewall.@zone[$i]" >/dev/null 2>&1; do
 done
 if [ -n "$wan_zone_idx" ]; then
     uci add_list firewall.@zone[$wan_zone_idx].network=wan2
+    uci add_list firewall.@zone[$wan_zone_idx].network=wan2_6
     uci commit firewall
 fi
 
