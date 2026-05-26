@@ -42,7 +42,8 @@ define Device/sx_7981r128
   DEVICE_MODEL := 7981R128
   DEVICE_DTS := mt7981b-sx-7981r128
   DEVICE_DTS_DIR := ../dts
-  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware kmod-usb3
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware kmod-usb3 \
+                     kmod-sfp kmod-i2c-gpio
   # 第一项 = 新 DTS 的 compatible 第一字段（运行时 board_name）
   # 第二项 = hanwckf 老固件 board name，允许从老固件直接 sysupgrade 过来
   SUPPORTED_DEVICES := sx,7981r128 mediatek,mt7981-spim-snand-7981r128
