@@ -102,3 +102,163 @@ msgstr ""
 #: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/settings.js:50
 msgid "eBPF-based Linux high-performance transparent proxy solution."
 msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Form"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Text"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Subscriptions"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Subscription URL"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Add Subscription"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Nodes (Manual)"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Node URI"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Add Node"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Routing Rules"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Condition Type"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Condition Value"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Operation"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Fallback"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Move Up"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Move Down"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Add Rule"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "DNS"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Upstream Servers"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Add Upstream"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "DNS Routing"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Domestic DNS"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Foreign DNS"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Custom DNS routing detected. Edit in text mode."
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Global Settings"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Log Level"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "LAN Interface"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "WAN Interface"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Allow Insecure"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Auto Config Kernel Parameter"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "-- select --"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Configuration saved and dae reloaded."
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Failed to load configuration."
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Config text has errors. Please fix before switching to form mode."
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Failed to serialize form: "
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "e.g. my_sub"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Letters, digits, underscore only"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Name"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Action"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "URL"
+msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Delete"
+msgstr ""

@@ -109,3 +109,163 @@ msgstr "dae"
 #: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/settings.js:50
 msgid "eBPF-based Linux high-performance transparent proxy solution."
 msgstr "基于 eBPF 的 Linux 高性能透明代理解决方案。"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Form"
+msgstr "表单模式"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Text"
+msgstr "文本模式"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Subscriptions"
+msgstr "订阅"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Subscription URL"
+msgstr "订阅 URL"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Add Subscription"
+msgstr "添加订阅"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Nodes (Manual)"
+msgstr "节点（手动）"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Node URI"
+msgstr "节点 URI"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Add Node"
+msgstr "添加节点"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Routing Rules"
+msgstr "路由规则"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Condition Type"
+msgstr "条件类型"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Condition Value"
+msgstr "条件值"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Operation"
+msgstr "操作"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Fallback"
+msgstr "兜底动作"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Move Up"
+msgstr "上移"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Move Down"
+msgstr "下移"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Add Rule"
+msgstr "添加规则"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "DNS"
+msgstr "DNS"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Upstream Servers"
+msgstr "上游服务器"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Add Upstream"
+msgstr "添加上游"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "DNS Routing"
+msgstr "DNS 路由"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Domestic DNS"
+msgstr "国内 DNS"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Foreign DNS"
+msgstr "国外 DNS"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Custom DNS routing detected. Edit in text mode."
+msgstr "检测到自定义 DNS 路由规则，请在文本模式下编辑。"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Global Settings"
+msgstr "全局设置"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Log Level"
+msgstr "日志级别"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "LAN Interface"
+msgstr "LAN 接口"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "WAN Interface"
+msgstr "WAN 接口"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Allow Insecure"
+msgstr "允许不安全连接"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Auto Config Kernel Parameter"
+msgstr "自动配置内核参数"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "-- select --"
+msgstr "-- 请选择 --"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Configuration saved and dae reloaded."
+msgstr "配置已保存，dae 已热重载。"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Failed to load configuration."
+msgstr "加载配置失败。"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Config text has errors. Please fix before switching to form mode."
+msgstr "配置文本有错误，请修正后再切换到表单模式。"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Failed to serialize form: "
+msgstr "表单序列化失败："
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "e.g. my_sub"
+msgstr "例如 my_sub"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Letters, digits, underscore only"
+msgstr "只允许字母、数字、下划线"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Name"
+msgstr "名称"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Action"
+msgstr "操作"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "URL"
+msgstr "URL"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Delete"
+msgstr "删除"
