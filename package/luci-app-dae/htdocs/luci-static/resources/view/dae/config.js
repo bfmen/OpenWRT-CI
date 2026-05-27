@@ -262,8 +262,97 @@ return view.extend({
         return section;
     },
 
-    _buildDNSSection:          function() { return E('div'); },
-    _buildGlobalSection:       function() { return E('div'); },
+    _buildDNSSection: function() {
+        var self = this;
+        var dns = ((self._config || {}).dns) || { upstream: {}, domestic: '', foreign: '', rawRouting: '' };
+        var upstream = dns.upstream || {};
+        var upstreamNames = Object.keys(upstream);
+        var section = E('div', { 'class': 'cbi-section', 'id': 'section-dns' });
+        section.appendChild(E('h3', {}, _('DNS')));
+        section.appendChild(E('h4', {}, _('Upstream Servers')));
+        var table = E('table', { 'class': 'table cbi-section-table', 'id': 'dns-upstream-table' }, [
+            E('tr', { 'class': 'cbi-section-table-titles' }, [
+                E('th', { 'class': 'cbi-section-table-cell', 'style': 'width:20%' }, _('Name')),
+                E('th', { 'class': 'cbi-section-table-cell' }, _('URL')),
+                E('th', { 'class': 'cbi-section-table-cell', 'style': 'width:80px' }, _('Action'))
+            ])
+        ]);
+        upstreamNames.forEach(function(name) {
+            table.appendChild(self._makeDNSUpstreamRow(name, upstream[name]));
+        });
+        section.appendChild(table);
+        section.appendChild(E('button', {
+            'class': 'btn cbi-button cbi-button-add',
+            'click': function() {
+                document.getElementById('dns-upstream-table').appendChild(
+                    self._makeDNSUpstreamRow('', ''));
+            }
+        }, '+ ' + _('Add Upstream')));
+
+        // DNS routing — simplified selectors or notice for custom routing
+        if (!dns.rawRouting) {
+            section.appendChild(E('h4', {}, _('DNS Routing')));
+            section.appendChild(E('div', { 'class': 'cbi-value' }, [
+                E('label', { 'class': 'cbi-value-title' }, _('Domestic DNS')),
+                E('div', { 'class': 'cbi-value-field' }, [
+                    self._makeDNSSelect('dns-domestic', dns.domestic, upstreamNames)
+                ])
+            ]));
+            section.appendChild(E('div', { 'class': 'cbi-value' }, [
+                E('label', { 'class': 'cbi-value-title' }, _('Foreign DNS')),
+                E('div', { 'class': 'cbi-value-field' }, [
+                    self._makeDNSSelect('dns-foreign', dns.foreign, upstreamNames)
+                ])
+            ]));
+        } else {
+            section.appendChild(E('p', { 'class': 'alert-message notice' },
+                _('Custom DNS routing detected. Edit in text mode.')));
+        }
+        return section;
+    },
+
+    _buildGlobalSection: function() {
+        var self = this;
+        var global_ = (self._config || {}).global || {};
+        var section = E('div', { 'class': 'cbi-section', 'id': 'section-global' });
+        section.appendChild(E('div', {
+            'style': 'cursor:pointer;user-select:none',
+            'click': function() {
+                var body = document.getElementById('global-section-body');
+                body.style.display = body.style.display === 'none' ? '' : 'none';
+            }
+        }, [E('h3', {}, '▶ ' + _('Global Settings'))]));
+        var body = E('div', { 'id': 'global-section-body', 'style': 'display:none' });
+        var fields = [
+            { key: 'log-level',                    label: _('Log Level'),                    type: 'select',   opts: ['error','warn','info','debug','trace'], def: 'info' },
+            { key: 'lan-interface',                label: _('LAN Interface'),                type: 'text',     def: 'br-lan' },
+            { key: 'wan-interface',                label: _('WAN Interface'),                type: 'text',     def: 'eth1'   },
+            { key: 'allow-insecure',               label: _('Allow Insecure'),               type: 'checkbox', def: 'false'  },
+            { key: 'auto-config-kernel-parameter', label: _('Auto Config Kernel Parameter'), type: 'checkbox', def: 'true'   }
+        ];
+        fields.forEach(function(f) {
+            var val = global_[f.key] !== undefined ? global_[f.key] : f.def;
+            var input;
+            if (f.type === 'select') {
+                input = E('select', { 'id': 'global-' + f.key, 'class': 'cbi-input-select' });
+                f.opts.forEach(function(o) {
+                    input.appendChild(E('option', { 'value': o, 'selected': o === val ? '' : null }, o));
+                });
+            } else if (f.type === 'checkbox') {
+                input = E('input', { 'type': 'checkbox', 'id': 'global-' + f.key,
+                    'checked': val === 'true' ? '' : null });
+            } else {
+                input = E('input', { 'type': 'text', 'id': 'global-' + f.key,
+                    'class': 'cbi-input-text', 'value': val });
+            }
+            body.appendChild(E('div', { 'class': 'cbi-value' }, [
+                E('label', { 'class': 'cbi-value-title', 'for': 'global-' + f.key }, f.label),
+                E('div', { 'class': 'cbi-value-field' }, [input])
+            ]));
+        });
+        section.appendChild(body);
+        return section;
+    },
 
     _makeRoutingRow: function(condType, condValue, action) {
         var self = this;
@@ -331,10 +420,145 @@ return view.extend({
         });
         return sel;
     },
-    _makeDNSUpstreamRow:       function()  { return E('tr'); },
-    _makeDNSSelect:            function()  { return E('select'); },
-    _getFormData:              function()  { return this._config || {}; },
-    _refreshForm:              function()  {},
+    _makeDNSUpstreamRow: function(name, url) {
+        var row = E('tr', { 'class': 'cbi-section-table-row dns-upstream-row' }, [
+            E('td', { 'class': 'cbi-section-table-cell' }, [
+                E('input', { 'type': 'text', 'class': 'cbi-input-text dns-upstream-name',
+                    'value': name, 'placeholder': 'alidns' })
+            ]),
+            E('td', { 'class': 'cbi-section-table-cell' }, [
+                E('input', { 'type': 'text', 'class': 'cbi-input-text dns-upstream-url',
+                    'value': url, 'placeholder': 'udp://223.5.5.5:53', 'style': 'width:100%' })
+            ]),
+            E('td', { 'class': 'cbi-section-table-cell' }, [
+                E('button', { 'class': 'btn cbi-button cbi-button-remove',
+                    'click': function() { row.parentNode.removeChild(row); } }, _('Delete'))
+            ])
+        ]);
+        return row;
+    },
+
+    _makeDNSSelect: function(id, selected, options) {
+        var sel = E('select', { 'id': id, 'class': 'cbi-input-select' });
+        sel.appendChild(E('option', { 'value': '' }, _('-- select --')));
+        options.forEach(function(o) {
+            sel.appendChild(E('option', { 'value': o, 'selected': o === selected ? '' : null }, o));
+        });
+        return sel;
+    },
+
+    _getFormData: function() {
+        var self = this;
+        var config = {
+            global: {}, subscription: {}, node: {},
+            routing: { rules: [], fallback: 'direct' },
+            dns: {
+                upstream: {}, domestic: '', foreign: '',
+                rawRouting: self._config ? (self._config.dns || {}).rawRouting || '' : ''
+            },
+            rawOther: self._config ? self._config.rawOther || '' : ''
+        };
+
+        // Global
+        ['log-level','lan-interface','wan-interface','allow-insecure','auto-config-kernel-parameter']
+            .forEach(function(key) {
+                var el = document.getElementById('global-' + key);
+                if (!el) return;
+                if (el.type === 'checkbox') config.global[key] = el.checked ? 'true' : 'false';
+                else if (el.value)          config.global[key] = el.value;
+            });
+
+        // Subscriptions
+        document.querySelectorAll('#sub-table .sub-row').forEach(function(row) {
+            var n = row.querySelector('.sub-name').value.trim();
+            var u = row.querySelector('.sub-url').value.trim();
+            if (n && u) config.subscription[n] = u;
+        });
+
+        // Nodes
+        document.querySelectorAll('#node-table .node-row').forEach(function(row) {
+            var n = row.querySelector('.node-name').value.trim();
+            var u = row.querySelector('.node-uri').value.trim();
+            if (n && u) config.node[n] = u;
+        });
+
+        // Routing rules
+        document.querySelectorAll('#routing-table .routing-row').forEach(function(row) {
+            var ct = row.querySelector('.rule-cond-type').value;
+            var cv = row.querySelector('.rule-cond-value').value.trim();
+            var ac = row.querySelector('.rule-action').value;
+            if (cv) config.routing.rules.push({ condType: ct, condValue: cv, action: ac });
+        });
+        var fbEl = document.getElementById('routing-fallback-action');
+        if (fbEl) config.routing.fallback = fbEl.value;
+
+        // DNS upstream
+        document.querySelectorAll('#dns-upstream-table .dns-upstream-row').forEach(function(row) {
+            var n = row.querySelector('.dns-upstream-name').value.trim();
+            var u = row.querySelector('.dns-upstream-url').value.trim();
+            if (n && u) config.dns.upstream[n] = u;
+        });
+        if (!config.dns.rawRouting) {
+            var domEl = document.getElementById('dns-domestic');
+            var forEl = document.getElementById('dns-foreign');
+            if (domEl) config.dns.domestic = domEl.value;
+            if (forEl) config.dns.foreign  = forEl.value;
+        }
+
+        return config;
+    },
+
+    _refreshForm: function() {
+        var self = this;
+        var config = self._config || {};
+
+        // Subscriptions
+        var subTable = document.getElementById('sub-table');
+        subTable.querySelectorAll('.sub-row').forEach(function(r) { r.parentNode.removeChild(r); });
+        Object.keys(config.subscription || {}).forEach(function(n) {
+            subTable.appendChild(self._makeSubRow(n, config.subscription[n]));
+        });
+
+        // Nodes
+        var nodeTable = document.getElementById('node-table');
+        nodeTable.querySelectorAll('.node-row').forEach(function(r) { r.parentNode.removeChild(r); });
+        Object.keys(config.node || {}).forEach(function(n) {
+            nodeTable.appendChild(self._makeNodeRow(n, config.node[n]));
+        });
+
+        // Routing rules
+        var routingTable = document.getElementById('routing-table');
+        routingTable.querySelectorAll('.routing-row').forEach(function(r) { r.parentNode.removeChild(r); });
+        var fbRow = document.getElementById('routing-fallback-row');
+        ((config.routing || {}).rules || []).forEach(function(rule) {
+            routingTable.insertBefore(
+                self._makeRoutingRow(rule.condType, rule.condValue, rule.action), fbRow);
+        });
+        var fbEl = document.getElementById('routing-fallback-action');
+        if (fbEl && config.routing) fbEl.value = config.routing.fallback || 'direct';
+
+        // DNS upstream
+        var dnsTable = document.getElementById('dns-upstream-table');
+        dnsTable.querySelectorAll('.dns-upstream-row').forEach(function(r) { r.parentNode.removeChild(r); });
+        Object.keys((config.dns || {}).upstream || {}).forEach(function(n) {
+            dnsTable.appendChild(self._makeDNSUpstreamRow(n, config.dns.upstream[n]));
+        });
+        var domEl = document.getElementById('dns-domestic');
+        var forEl = document.getElementById('dns-foreign');
+        if (domEl && config.dns) domEl.value = config.dns.domestic || '';
+        if (forEl && config.dns) forEl.value = config.dns.foreign  || '';
+
+        // Global
+        ['log-level','lan-interface','wan-interface','allow-insecure','auto-config-kernel-parameter']
+            .forEach(function(key) {
+                var el = document.getElementById('global-' + key);
+                if (!el) return;
+                var val = ((config.global || {})[key]) || '';
+                if      (el.type === 'checkbox') el.checked = val === 'true';
+                else if (el.tagName === 'SELECT') el.value  = val;
+                else                             el.value   = val;
+            });
+    },
 
     // ── Save ─────────────────────────────────────────────────────────────────
     handleSaveApply: function(ev, mode) {
