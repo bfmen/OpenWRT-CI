@@ -113,9 +113,10 @@ diy.sh `[device-add]` 步骤 1b 会将以上三个文件打成 `450-add-sx-7981r
 | `Config/IPQ60XX-DAE-EMMC-WIFI-NO.txt` | DAE 构建配置，无 WiFi |
 
 **dae 和 luci-app-dae 包独立维护**：https://github.com/ysuolmai/luci-app-dae
-- 包含 dae 主程序包（Makefile/init/UCI）+ LuCI UI（表单模式 + 文本模式双 Tab）
-- diy.sh 在 DAE 构建时 git clone 该仓库并复制到 `package/`
-- 上游更新或 UI 改动只需在那个仓库提交
+- 包含 dae 主程序包（Makefile/init/UCI）+ LuCI UI（表单/所有节点/文本 三 Tab，含 group/订阅/路由/DNS/全局表单）
+- diy.sh 在 DAE 构建时 `git clone --depth=1` 该仓库 **main 分支** 并复制到 `package/`
+- **本仓库不需要锁定 luci-app-dae 版本**：每次 OpenWRT-CI 编译都自动拉最新 main → luci-app-dae 改一行 push，下次 OpenWRT-CI 编译就用上
+- 该仓库的 Claude 上下文文档：`luci-app-dae/CLAUDE.md`（迭代 UI/解析器时去那边看）
 
 ### 与普通 EMMC 构建的区别
 - 内核开启 eBPF/BTF/XDP/Cgroup 相关选项
