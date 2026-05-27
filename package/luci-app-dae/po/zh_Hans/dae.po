@@ -269,3 +269,7 @@ msgstr "URL"
 #: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
 msgid "Delete"
 msgstr "删除"
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Config parse error — opened in text mode: "
+msgstr "配置解析失败，已切换到文本模式："

@@ -262,3 +262,7 @@ msgstr ""
 #: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
 msgid "Delete"
 msgstr ""
+
+#: applications/luci-app-dae/htdocs/luci-static/resources/view/dae/config.js
+msgid "Config parse error — opened in text mode: "
+msgstr ""
