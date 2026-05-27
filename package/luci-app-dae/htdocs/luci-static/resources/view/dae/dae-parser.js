@@ -76,9 +76,50 @@ var DaeParser = {
         return blocks;
     },
 
-    // Stubs — implemented in later tasks
-    _parseKV:           function() { return {}; },
-    _parseRoutingRules: function() { return { rules: [], fallback: 'direct' }; },
+    /**
+     * Parse "name: value" lines.
+     * Handles 'single-quoted', "double-quoted", and unquoted values.
+     * Returns { name: value } with quotes stripped.
+     * Skips # comments and blank lines.
+     */
+    _parseKV: function(content) {
+        var result = {};
+        var lines = content.split('\n');
+        for (var i = 0; i < lines.length; i++) {
+            var trimmed = lines[i].trim();
+            if (!trimmed || trimmed[0] === '#') continue;
+            var m = trimmed.match(/^([\w][\w-]*)\s*:\s*(.*)$/);
+            if (!m) continue;
+            var key = m[1];
+            var val = m[2].trim();
+            // Strip leading/trailing quote (same char)
+            val = val.replace(/^(['"])(.*)\1$/, '$2');
+            result[key] = val;
+        }
+        return result;
+    },
+
+    /**
+     * Parse routing block content → { rules: [...], fallback: string }
+     * Each rule: condType(condValue) -> action
+     * Fallback: fallback: action
+     */
+    _parseRoutingRules: function(content) {
+        var rules = [];
+        var fallback = 'direct';
+        var lines = content.split('\n');
+        for (var i = 0; i < lines.length; i++) {
+            var trimmed = lines[i].trim();
+            if (!trimmed || trimmed[0] === '#') continue;
+            var fb = trimmed.match(/^fallback\s*:\s*(\S+)/);
+            if (fb) { fallback = fb[1]; continue; }
+            var rule = trimmed.match(/^([\w!][\w-]*)\(([^)]*)\)\s*->\s*(\S+)/);
+            if (rule) {
+                rules.push({ condType: rule[1], condValue: rule[2].trim(), action: rule[3] });
+            }
+        }
+        return { rules: rules, fallback: fallback };
+    },
     _parseDNS:          function() { return { upstream: {}, domestic: '', foreign: '', rawRouting: '' }; },
     parse:              function() { return { global: {}, subscription: {}, node: {}, routing: { rules: [], fallback: 'direct' }, dns: { upstream: {}, domestic: '', foreign: '', rawRouting: '' }, rawOther: '' }; },
     serialize:          function() { return ''; }
