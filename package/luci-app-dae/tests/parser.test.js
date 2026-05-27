@@ -122,6 +122,170 @@ test('defaults fallback to direct when missing', function() {
     assert.strictEqual(r.fallback, 'direct');
 });
 
+// ---- _parseDNS ----
+console.log('\n_parseDNS:');
+
+var DNS_SIMPLE = [
+    '    upstream {',
+    "        alidns: 'udp://223.5.5.5:53'",
+    "        googledns: 'tcp+udp://8.8.8.8:53'",
+    '    }',
+    '    routing {',
+    '        request {',
+    '            qname(geosite:cn) -> alidns',
+    '            fallback: googledns',
+    '        }',
+    '        response {',
+    '            upstream(googledns) -> accept',
+    '            !qname(geosite:cn) -> googledns',
+    '            fallback: accept',
+    '        }',
+    '    }'
+].join('\n');
+
+test('parses upstream servers', function() {
+    var r = DaeParser._parseDNS(DNS_SIMPLE);
+    assert.strictEqual(r.upstream['alidns'], 'udp://223.5.5.5:53');
+    assert.strictEqual(r.upstream['googledns'], 'tcp+udp://8.8.8.8:53');
+});
+
+test('detects simplified domestic/foreign template', function() {
+    var r = DaeParser._parseDNS(DNS_SIMPLE);
+    assert.strictEqual(r.domestic, 'alidns');
+    assert.strictEqual(r.foreign, 'googledns');
+    assert.strictEqual(r.rawRouting, '');
+});
+
+test('stores non-template routing as rawRouting', function() {
+    var custom = "    upstream {\n        alidns: 'udp://223.5.5.5:53'\n    }\n    routing {\n        request {\n            custom_rule(foo) -> bar\n        }\n    }";
+    var r = DaeParser._parseDNS(custom);
+    assert.ok(r.rawRouting.length > 0);
+    assert.strictEqual(r.domestic, '');
+    assert.strictEqual(r.foreign, '');
+});
+
+test('handles dns block with no routing sub-block', function() {
+    var r = DaeParser._parseDNS("    upstream {\n        alidns: 'udp://223.5.5.5:53'\n    }");
+    assert.strictEqual(r.upstream['alidns'], 'udp://223.5.5.5:53');
+    assert.strictEqual(r.rawRouting, '');
+});
+
+// ---- parse() ----
+console.log('\nparse():');
+
+var FULL_CONFIG = [
+    'global {',
+    '    log-level: info',
+    '    lan-interface: br-lan',
+    '    wan-interface: eth1',
+    '}',
+    '',
+    'subscription {',
+    "    my_sub: 'https://example.com/sub'",
+    '}',
+    '',
+    'dns {',
+    '    upstream {',
+    "        alidns: 'udp://223.5.5.5:53'",
+    "        googledns: 'tcp+udp://8.8.8.8:53'",
+    '    }',
+    '    routing {',
+    '        request {',
+    '            qname(geosite:cn) -> alidns',
+    '            fallback: googledns',
+    '        }',
+    '        response {',
+    '            upstream(googledns) -> accept',
+    '            !qname(geosite:cn) -> googledns',
+    '            fallback: accept',
+    '        }',
+    '    }',
+    '}',
+    '',
+    'routing {',
+    '    domain(geosite:cn) -> direct',
+    '    dip(geoip:cn) -> direct',
+    '    dip(geoip:private) -> direct',
+    '    fallback: my_sub',
+    '}'
+].join('\n');
+
+test('parses global block', function() {
+    var c = DaeParser.parse(FULL_CONFIG);
+    assert.strictEqual(c.global['log-level'], 'info');
+    assert.strictEqual(c.global['lan-interface'], 'br-lan');
+    assert.strictEqual(c.global['wan-interface'], 'eth1');
+});
+
+test('parses subscription block', function() {
+    var c = DaeParser.parse(FULL_CONFIG);
+    assert.strictEqual(c.subscription['my_sub'], 'https://example.com/sub');
+});
+
+test('parses dns upstream and detects template', function() {
+    var c = DaeParser.parse(FULL_CONFIG);
+    assert.strictEqual(c.dns.upstream['alidns'], 'udp://223.5.5.5:53');
+    assert.strictEqual(c.dns.domestic, 'alidns');
+    assert.strictEqual(c.dns.foreign, 'googledns');
+    assert.strictEqual(c.dns.rawRouting, '');
+});
+
+test('parses routing rules', function() {
+    var c = DaeParser.parse(FULL_CONFIG);
+    assert.strictEqual(c.routing.rules.length, 3);
+    assert.strictEqual(c.routing.rules[0].condType, 'domain');
+    assert.strictEqual(c.routing.fallback, 'my_sub');
+});
+
+test('stores unknown blocks in rawOther', function() {
+    var withUnknown = FULL_CONFIG + '\n\nunknown_block {\n    x: y\n}';
+    var c = DaeParser.parse(withUnknown);
+    assert.ok(c.rawOther.includes('unknown_block'));
+});
+
+// ---- serialize() ----
+console.log('\nserialize():');
+
+test('serialize output is re-parseable (round-trip)', function() {
+    var c = DaeParser.parse(FULL_CONFIG);
+    var s = DaeParser.serialize(c);
+    var c2 = DaeParser.parse(s);
+    assert.deepStrictEqual(c2.global, c.global);
+    assert.deepStrictEqual(c2.subscription, c.subscription);
+    assert.deepStrictEqual(c2.dns.upstream, c.dns.upstream);
+    assert.strictEqual(c2.dns.domestic, c.dns.domestic);
+    assert.strictEqual(c2.dns.foreign, c.dns.foreign);
+    assert.deepStrictEqual(c2.routing.rules, c.routing.rules);
+    assert.strictEqual(c2.routing.fallback, c.routing.fallback);
+});
+
+test('global block comes before subscription block', function() {
+    var c = DaeParser.parse(FULL_CONFIG);
+    var s = DaeParser.serialize(c);
+    assert.ok(s.indexOf('global {') < s.indexOf('subscription {'));
+});
+
+test('serialize preserves rawOther', function() {
+    var withUnknown = FULL_CONFIG + '\n\nunknown_block {\n    x: y\n}';
+    var c = DaeParser.parse(withUnknown);
+    var s = DaeParser.serialize(c);
+    assert.ok(s.includes('unknown_block'));
+});
+
+test('serialize generates simplified dns routing template', function() {
+    var c = DaeParser.parse(FULL_CONFIG);
+    var s = DaeParser.serialize(c);
+    assert.ok(s.includes('qname(geosite:cn) -> alidns'));
+    assert.ok(s.includes('upstream(googledns) -> accept'));
+});
+
+test('serialize skips empty blocks', function() {
+    var c = DaeParser.parse('routing {\n    fallback: direct\n}');
+    var s = DaeParser.serialize(c);
+    assert.ok(!s.includes('subscription {'));
+    assert.ok(!s.includes('node {'));
+});
+
 console.log('\n--- Results ---');
 console.log('Passed: ' + passed + '  Failed: ' + failed);
 if (failed > 0) process.exit(1);

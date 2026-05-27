@@ -120,9 +120,155 @@ var DaeParser = {
         }
         return { rules: rules, fallback: fallback };
     },
-    _parseDNS:          function() { return { upstream: {}, domestic: '', foreign: '', rawRouting: '' }; },
-    parse:              function() { return { global: {}, subscription: {}, node: {}, routing: { rules: [], fallback: 'direct' }, dns: { upstream: {}, domestic: '', foreign: '', rawRouting: '' }, rawOther: '' }; },
-    serialize:          function() { return ''; }
+    /**
+     * Parse dns block content.
+     * Returns { upstream: {name: url}, domestic, foreign, rawRouting }
+     * Detects the simplified domestic/foreign template; stores custom
+     * routing verbatim in rawRouting.
+     */
+    _parseDNS: function(content) {
+        var self = this;
+        var result = { upstream: {}, domestic: '', foreign: '', rawRouting: '' };
+        var subBlocks = self._extractBlocks(content);
+
+        if (subBlocks['upstream'])
+            result.upstream = self._parseKV(subBlocks['upstream']);
+
+        if (subBlocks['routing']) {
+            var routingContent = subBlocks['routing'];
+            var rb = self._extractBlocks(routingContent);
+            var reqLines = (rb['request'] || '').split('\n')
+                .map(function(l) { return l.trim(); }).filter(Boolean);
+            var respLines = (rb['response'] || '').split('\n')
+                .map(function(l) { return l.trim(); }).filter(Boolean);
+
+            // Check simplified template:
+            // request: qname(geosite:cn) -> <dom>, fallback: <for>
+            // response: upstream(<for>) -> accept, !qname(geosite:cn) -> <for>, fallback: accept
+            var isSimple = false, domestic = '', foreign = '';
+            if (reqLines.length === 2) {
+                var r1 = reqLines[0].match(/^qname\(geosite:cn\)\s*->\s*(\S+)/);
+                var r2 = reqLines[1].match(/^fallback\s*:\s*(\S+)/);
+                if (r1 && r2) {
+                    domestic = r1[1]; foreign = r2[1];
+                    if (respLines.length === 3) {
+                        var s1 = respLines[0].match(/^upstream\((\S+)\)\s*->\s*accept/);
+                        var s2 = respLines[1].match(/^!qname\(geosite:cn\)\s*->\s*(\S+)/);
+                        var s3 = respLines[2].match(/^fallback\s*:\s*accept/);
+                        if (s1 && s1[1] === foreign && s2 && s2[1] === foreign && s3)
+                            isSimple = true;
+                    }
+                }
+            }
+            if (isSimple) { result.domestic = domestic; result.foreign = foreign; }
+            else { result.rawRouting = routingContent; }
+        }
+        return result;
+    },
+
+    /**
+     * Parse full dae config text → DaeConfig object.
+     */
+    parse: function(text) {
+        var self = this;
+        var blocks = self._extractBlocks(text);
+        var config = {
+            global: {}, subscription: {}, node: {},
+            routing: { rules: [], fallback: 'direct' },
+            dns: { upstream: {}, domestic: '', foreign: '', rawRouting: '' },
+            rawOther: ''
+        };
+
+        if (blocks['global'])       config.global       = self._parseKV(blocks['global']);
+        if (blocks['subscription']) config.subscription = self._parseKV(blocks['subscription']);
+        if (blocks['node'])         config.node         = self._parseKV(blocks['node']);
+        if (blocks['routing'])      config.routing      = self._parseRoutingRules(blocks['routing']);
+        if (blocks['dns'])          config.dns          = self._parseDNS(blocks['dns']);
+
+        // Preserve unknown blocks verbatim
+        var known = ['global', 'subscription', 'node', 'routing', 'dns', '__preamble'];
+        var otherParts = blocks['__preamble'] ? [blocks['__preamble']] : [];
+        for (var name in blocks) {
+            if (known.indexOf(name) === -1)
+                otherParts.push(name + ' {\n' + blocks[name] + '\n}');
+        }
+        config.rawOther = otherParts.join('\n\n');
+        return config;
+    },
+
+    /**
+     * Serialize DaeConfig → dae DSL string.
+     * Order: global → subscription → node → dns → routing → rawOther
+     */
+    serialize: function(config) {
+        var parts = [];
+        var g = config.global || {}, gk = Object.keys(g);
+        if (gk.length) {
+            var ls = ['global {'];
+            gk.forEach(function(k) { ls.push('    ' + k + ': ' + g[k]); });
+            ls.push('}'); parts.push(ls.join('\n'));
+        }
+
+        var sk = Object.keys(config.subscription || {});
+        if (sk.length) {
+            var ls = ['subscription {'];
+            sk.forEach(function(k) { ls.push("    " + k + ": '" + config.subscription[k] + "'"); });
+            ls.push('}'); parts.push(ls.join('\n'));
+        }
+
+        var nk = Object.keys(config.node || {});
+        if (nk.length) {
+            var ls = ['node {'];
+            nk.forEach(function(k) { ls.push("    " + k + ": '" + config.node[k] + "'"); });
+            ls.push('}'); parts.push(ls.join('\n'));
+        }
+
+        var dns = config.dns || {};
+        var uk = Object.keys(dns.upstream || {});
+        if (uk.length || dns.domestic || dns.foreign || dns.rawRouting) {
+            var ls = ['dns {'];
+            if (uk.length) {
+                ls.push('    upstream {');
+                uk.forEach(function(k) { ls.push("        " + k + ": '" + dns.upstream[k] + "'"); });
+                ls.push('    }');
+            }
+            if (dns.rawRouting) {
+                ls.push('    routing {');
+                dns.rawRouting.split('\n').forEach(function(l) { ls.push('    ' + l); });
+                ls.push('    }');
+            } else if (dns.domestic || dns.foreign) {
+                var dom = dns.domestic || (uk[0] || '');
+                var fgn = dns.foreign  || (uk[1] || '');
+                ls.push('    routing {');
+                ls.push('        request {');
+                ls.push('            qname(geosite:cn) -> ' + dom);
+                ls.push('            fallback: ' + fgn);
+                ls.push('        }');
+                ls.push('        response {');
+                ls.push('            upstream(' + fgn + ') -> accept');
+                ls.push('            !qname(geosite:cn) -> ' + fgn);
+                ls.push('            fallback: accept');
+                ls.push('        }');
+                ls.push('    }');
+            }
+            ls.push('}'); parts.push(ls.join('\n'));
+        }
+
+        var routing = config.routing || {};
+        var rules = routing.rules || [];
+        var fb = routing.fallback || 'direct';
+        {
+            var ls = ['routing {'];
+            rules.forEach(function(r) {
+                ls.push('    ' + r.condType + '(' + r.condValue + ') -> ' + r.action);
+            });
+            ls.push('    fallback: ' + fb);
+            ls.push('}'); parts.push(ls.join('\n'));
+        }
+
+        if (config.rawOther) parts.push(config.rawOther);
+        return parts.join('\n\n');
+    }
 };
 
 if (typeof module !== 'undefined') module.exports = DaeParser;
