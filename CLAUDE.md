@@ -58,7 +58,7 @@ cat Config/*.txt >> .config
 | 节 | 内容 |
 |----|------|
 | [upstream-fix] | 删除上游格式损坏的 globitel patch（会导致 MT7981 uboot 编译失败） |
-| [device-add] | 注入 sx_7981r128：内核 DTS、U-Boot patch 生成、uboot-mediatek/Makefile 修改、filogic.mk（含 FIP artifacts）、02_network、uci-defaults |
+| [device-add] | 注入 sx_7981r128：DTS 复制、filogic.mk 条目、02_network、uci-defaults |
 | UPDATE_PACKAGE | 安装/更新第三方包（poweroff、tailscale、gecoosac、openlist2、jell 批量、netspeedtest 等） |
 | provided_config_lines | 写入额外的 .config 配置项 |
 | pkg-fix 1/2/3 | iptables → kmod-nf-ipt/iptables-nft 依赖替换 |
@@ -70,29 +70,14 @@ cat Config/*.txt >> .config
 - 包含 spi-cal-* 校准属性
 - 内存节点: `<0 0x40000000 0 0x20000000>` = 512MB
 
-### Scripts/uboot/ — U-Boot 支持文件
-| 文件 | 用途 |
-|------|------|
-| `mt7981-sx-7981r128.dts` | U-Boot 专用 DTS（比内核 DTS 简化，含 MT7531 ethernet 配置） |
-| `mt7981_sx_7981r128_defconfig` | U-Boot defconfig（DDR3-1866, SPIM-NAND, UBI env）|
-| `sx_7981r128_env` | U-Boot defenvs（启动菜单、TFTP recovery、FIP/BL2 烧写命令）|
+## sx_7981r128 FIP / U-Boot
 
-diy.sh `[device-add]` 步骤 1b 会将以上三个文件打成 `450-add-sx-7981r128.patch` 放入 `package/boot/uboot-mediatek/patches/`，并在 `package/boot/uboot-mediatek/Makefile` 中注入 `mt7981_sx_7981r128` 构建目标（BL2_DDRTYPE=ddr3-1866，依赖 trusted-firmware-a-mt7981-spim-nand-ddr3-1866）。
+**本仓库只产 `sysupgrade.bin`（sysupgrade-tar），不掺和 U-Boot/FIP/BL2。**
 
-## sx_7981r128 FIP 状态
-
-**当前：产出 `sysupgrade.itb`（内核+rootfs FIT）+ `bl31-uboot.fip`（U-Boot FIP）+ `preloader.bin`（BL2）**
-
-- DDR 颗粒：SK Hynix H5TQ4G63EFR-RDC（DDR3-1866，512MB）已确认
-- ATF BL2 预编译包：`trusted-firmware-a-mt7981-spim-nand-ddr3-1866`（VIKINGYFY/immortalwrt 上游已有）
-- U-Boot defconfig：`mt7981_sx_7981r128_defconfig`（Scripts/uboot/ 注入）
-- U-Boot DTS 关键点：GMAC0 + MT7531（reset GPIO 39）+ `2500base-x` fixed-link，与 nokia/qihoo 同款
-
-### 刷机流程（首次从 hanwckf 固件升级）
-1. 进入 hanwckf U-Boot recovery，通过 HTTP 或 TFTP 刷入 `preloader.bin` 到 bl2 分区（非必须，hanwckf BL2 DDR3 init 兼容）
-2. 通过 TFTP 刷入 `bl31-uboot.fip` 到 fip 分区
-3. 重启后进入新 U-Boot bootmenu，通过 TFTP 刷入 `sysupgrade.itb` 到 fit volume
-4. 日后升级：LuCI sysupgrade 直接上传 `sysupgrade.itb`
+FIP / preloader 在独立仓库构建：<https://github.com/ysuolmai/UBOOT-CI>
+- 包含 ATF BL2 + U-Boot DTS + defconfig + defenvs
+- 产出 `preloader.bin` + `bl31-uboot.fip`
+- 设备硬件：MT7981B + 512MB DDR3-1866（SK Hynix H5TQ4G63EFR-RDC）+ 128MB SPIM-NAND + MT7531 switch（reset GPIO 39）+ EN8801SC 2.5G PHY
 
 ## 重要约定
 
