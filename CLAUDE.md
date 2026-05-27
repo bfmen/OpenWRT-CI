@@ -89,9 +89,28 @@ BL2 几乎不需要替换（设备已有 hanwckf BL2 正常工作）；主要工
 ## 重要约定
 
 - **Git commit co-author**: `Co-Authored-By: bugwriter <noreply@wahlau.top>`
-- **push 冲突**：直接 force push，不 rebase
+- **push 前必须先 pull --rebase**：执行 `git pull --rebase origin main` 再 push，严禁直接 force push（会覆盖其他 session 的 commits）
 - **WireGuard 相关包已移除**（`kmod-wireguard`、`wireguard-tools`、`luci-proto-wireguard`）
 - Docker 相关：EMMC 设备才启用，MTK SPIM-NAND 设备不加
+
+## DAE 支持（IPQ60XX eMMC 设备）
+
+本项目在 QCA IPQ60XX eMMC 设备上额外提供基于 eBPF 的透明代理固件（dae）。
+
+### 相关文件
+| 文件 | 说明 |
+|------|------|
+| `package/dae/` | dae 主程序包（eBPF 透明代理，勿删） |
+| `package/luci-app-dae/` | dae 的 LuCI Web UI（勿删） |
+| `Config/IPQ60XX-DAE-EMMC-WIFI-YES.txt` | DAE 构建配置，含 WiFi |
+| `Config/IPQ60XX-DAE-EMMC-WIFI-NO.txt` | DAE 构建配置，无 WiFi |
+
+### 与普通 EMMC 构建的区别
+- 内核开启 eBPF/BTF/XDP/Cgroup 相关选项
+- 启用 QCA SKB Recycler 内存优化
+- **不包含** openclash / passwall（由 `diy.sh` 末尾 `[dae]` 块清除）
+- 内核分区从 6144k 扩大至 12288k（eBPF 编译产物更大）
+- 目标设备同 EMMC 白名单：`redmi_ax5-jdcloud`、`jdcloud_re-ss-01`、`jdcloud_re-cs-07`
 
 ## 常见问题
 
