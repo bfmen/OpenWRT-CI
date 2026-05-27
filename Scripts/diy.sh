@@ -663,6 +663,20 @@ if [[ "$WRT_CONFIG" == *"DAE"* ]]; then
     echo "================================================================"
     echo "[dae] 开始 DAE 构建专项配置..."
 
+    # 0. 从独立仓库拉取 dae + luci-app-dae 包
+    #    仓库：https://github.com/ysuolmai/luci-app-dae
+    #    这两个包独立维护，便于版本升级和复用，不污染主仓库
+    DAE_FEED_DIR="/tmp/luci-app-dae-feed"
+    rm -rf "$DAE_FEED_DIR"
+    if git clone --depth=1 https://github.com/ysuolmai/luci-app-dae "$DAE_FEED_DIR"; then
+        rm -rf package/dae package/luci-app-dae
+        cp -rf "$DAE_FEED_DIR/dae"          package/
+        cp -rf "$DAE_FEED_DIR/luci-app-dae" package/
+        echo "[dae] 已从 ysuolmai/luci-app-dae 拉取 dae + luci-app-dae"
+    else
+        echo "[dae] 警告：clone luci-app-dae 失败，跳过（构建将失败）"
+    fi
+
     # 1. 移除 openclash 和 passwall（dae 是唯一透明代理，避免冲突）
     sed -i '/openclash/d; /passwall/d' .config
     echo "[dae] 已从 .config 移除 openclash / passwall 相关行"

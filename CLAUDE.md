@@ -100,10 +100,14 @@ BL2 几乎不需要替换（设备已有 hanwckf BL2 正常工作）；主要工
 ### 相关文件
 | 文件 | 说明 |
 |------|------|
-| `package/dae/` | dae 主程序包（eBPF 透明代理，勿删） |
-| `package/luci-app-dae/` | dae 的 LuCI Web UI（勿删） |
+| `Scripts/diy.sh` 末尾 `[dae]` 块 | 从 `ysuolmai/luci-app-dae` clone 包，并扩大 eMMC 内核分区 |
 | `Config/IPQ60XX-DAE-EMMC-WIFI-YES.txt` | DAE 构建配置，含 WiFi |
 | `Config/IPQ60XX-DAE-EMMC-WIFI-NO.txt` | DAE 构建配置，无 WiFi |
+
+**dae 和 luci-app-dae 包独立维护**：https://github.com/ysuolmai/luci-app-dae
+- 包含 dae 主程序包（Makefile/init/UCI）+ LuCI UI（表单模式 + 文本模式双 Tab）
+- diy.sh 在 DAE 构建时 git clone 该仓库并复制到 `package/`
+- 上游更新或 UI 改动只需在那个仓库提交
 
 ### 与普通 EMMC 构建的区别
 - 内核开启 eBPF/BTF/XDP/Cgroup 相关选项
