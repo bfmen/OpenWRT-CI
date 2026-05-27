@@ -224,11 +224,113 @@ return view.extend({
         return row;
     },
 
-    _buildRoutingSection:      function() { return E('div'); },
+    _buildRoutingSection: function() {
+        var self = this;
+        var routing = ((self._config || {}).routing) || { rules: [], fallback: 'direct' };
+        var section = E('div', { 'class': 'cbi-section', 'id': 'section-routing' });
+        section.appendChild(E('h3', {}, _('Routing Rules')));
+        var table = E('table', { 'class': 'table cbi-section-table', 'id': 'routing-table' }, [
+            E('tr', { 'class': 'cbi-section-table-titles' }, [
+                E('th', { 'class': 'cbi-section-table-cell', 'style': 'width:15%' }, _('Condition Type')),
+                E('th', { 'class': 'cbi-section-table-cell' },                       _('Condition Value')),
+                E('th', { 'class': 'cbi-section-table-cell', 'style': 'width:18%' }, _('Action')),
+                E('th', { 'class': 'cbi-section-table-cell', 'style': 'width:120px' }, _('Operation'))
+            ])
+        ]);
+        (routing.rules || []).forEach(function(rule) {
+            table.appendChild(self._makeRoutingRow(rule.condType, rule.condValue, rule.action));
+        });
+        // Fallback row (always last, not removable or sortable)
+        var fallbackRow = E('tr', { 'class': 'cbi-section-table-row', 'id': 'routing-fallback-row' }, [
+            E('td', { 'class': 'cbi-section-table-cell' }, E('strong', {}, _('Fallback'))),
+            E('td', { 'class': 'cbi-section-table-cell' }, '—'),
+            E('td', { 'class': 'cbi-section-table-cell' }, [
+                self._makeActionSelect('routing-fallback-action', routing.fallback || 'direct')
+            ]),
+            E('td', { 'class': 'cbi-section-table-cell' }, '—')
+        ]);
+        table.appendChild(fallbackRow);
+        section.appendChild(table);
+        section.appendChild(E('button', {
+            'class': 'btn cbi-button cbi-button-add',
+            'click': function() {
+                var fb = document.getElementById('routing-fallback-row');
+                document.getElementById('routing-table').insertBefore(
+                    self._makeRoutingRow('domain', '', 'direct'), fb);
+            }
+        }, '+ ' + _('Add Rule')));
+        return section;
+    },
+
     _buildDNSSection:          function() { return E('div'); },
     _buildGlobalSection:       function() { return E('div'); },
-    _makeRoutingRow:           function()  { return E('tr'); },
-    _makeActionSelect:         function()  { return E('select'); },
+
+    _makeRoutingRow: function(condType, condValue, action) {
+        var self = this;
+        var condTypes = ['domain', 'dip', 'sip', 'pname', 'l4proto', 'port'];
+        var typeSelect = E('select', { 'class': 'cbi-input-select rule-cond-type' });
+        condTypes.forEach(function(t) {
+            typeSelect.appendChild(E('option', { 'value': t, 'selected': t === condType ? '' : null }, t));
+        });
+        var row = E('tr', { 'class': 'cbi-section-table-row routing-row' }, [
+            E('td', { 'class': 'cbi-section-table-cell' }, [typeSelect]),
+            E('td', { 'class': 'cbi-section-table-cell' }, [
+                E('input', {
+                    'type': 'text', 'class': 'cbi-input-text rule-cond-value',
+                    'value': condValue, 'placeholder': 'geosite:cn'
+                })
+            ]),
+            E('td', { 'class': 'cbi-section-table-cell' }, [
+                self._makeActionSelect('', action)
+            ]),
+            E('td', { 'class': 'cbi-section-table-cell' }, [
+                E('button', {
+                    'class': 'btn cbi-button', 'title': _('Move Up'),
+                    'click': function() {
+                        var prev = row.previousElementSibling;
+                        if (prev && prev.classList.contains('routing-row'))
+                            row.parentNode.insertBefore(row, prev);
+                    }
+                }, '↑'),
+                ' ',
+                E('button', {
+                    'class': 'btn cbi-button', 'title': _('Move Down'),
+                    'click': function() {
+                        var next = row.nextElementSibling;
+                        if (next && next.classList.contains('routing-row'))
+                            row.parentNode.insertBefore(next, row);
+                    }
+                }, '↓'),
+                ' ',
+                E('button', {
+                    'class': 'btn cbi-button cbi-button-remove',
+                    'click': function() { row.parentNode.removeChild(row); }
+                }, _('Delete'))
+            ])
+        ]);
+        return row;
+    },
+
+    _makeActionSelect: function(id, selectedAction) {
+        var self = this;
+        var config = self._config || {};
+        var options = ['direct', 'block'];
+        Object.keys(config.subscription || {}).forEach(function(n) {
+            if (options.indexOf(n) === -1) options.push(n);
+        });
+        Object.keys(config.node || {}).forEach(function(n) {
+            if (options.indexOf(n) === -1) options.push(n);
+        });
+        if (selectedAction && options.indexOf(selectedAction) === -1)
+            options.push(selectedAction);
+        var attrs = { 'class': 'cbi-input-select rule-action' };
+        if (id) attrs['id'] = id;
+        var sel = E('select', attrs);
+        options.forEach(function(o) {
+            sel.appendChild(E('option', { 'value': o, 'selected': o === selectedAction ? '' : null }, o));
+        });
+        return sel;
+    },
     _makeDNSUpstreamRow:       function()  { return E('tr'); },
     _makeDNSSelect:            function()  { return E('select'); },
     _getFormData:              function()  { return this._config || {}; },
