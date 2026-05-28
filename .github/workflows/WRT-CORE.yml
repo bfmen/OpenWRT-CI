@@ -171,7 +171,7 @@ jobs:
           make download -j$(nproc)
 
       - name: Save Dl Cache
-        if: env.WRT_TEST != 'true' && steps.cache.outputs.dl-hit != 'true'
+        if: env.WRT_TEST != 'true' 
         uses: ysuolmai/openwrt-smart-cache/save-dl@v1
         with:
           cache-key: ${{steps.cache.outputs.dl-key}}
@@ -185,7 +185,7 @@ jobs:
           make toolchain/install -j$(nproc) || make toolchain/install -j1 V=s
 
       - name: Save Toolchain Cache
-        if: env.WRT_TEST != 'true' && steps.cache.outputs.toolchain-hit != 'true'
+        if: env.WRT_TEST != 'true' 
         uses: ysuolmai/openwrt-smart-cache/save-toolchain@v1
         with:
           cache-key: ${{steps.cache.outputs.toolchain-key}}
@@ -202,7 +202,7 @@ jobs:
           make package/compile -j$(nproc) || make package/compile -j1 V=s
 
       - name: Save Staging Cache
-        if: env.WRT_TEST != 'true' && steps.cache.outputs.staging-hit != 'true'
+        if: env.WRT_TEST != 'true' 
         uses: ysuolmai/openwrt-smart-cache/save-staging@v1
         with:
           cache-key: ${{steps.cache.outputs.staging-key}}
