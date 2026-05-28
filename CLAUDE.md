@@ -97,7 +97,6 @@ FIP / preloader 在独立仓库构建：<https://github.com/ysuolmai/UBOOT-CI>
 | `Config/IPQ60XX-DAE-EMMC-WIFI-YES.txt` | QCA + DAE，含 WiFi（参考 IPQ60XX-EMMC-WIFI-YES 设备列表）|
 | `Config/IPQ60XX-DAE-EMMC-WIFI-NO.txt` | QCA + DAE，无 WiFi |
 | `Config/MTK-DAE-WIFI-YES.txt` | MTK filogic + DAE，含 WiFi（diy.sh 白名单过滤到 sx_7981r128 / nokia_ea0326gmp / cmcc_rax3000m）|
-| `Config/MTK-DAE-WIFI-NO.txt` | MTK filogic + DAE，无 WiFi（SuperGateway / Zyxel）|
 
 **dae 和 luci-app-dae 包独立维护**：https://github.com/ysuolmai/luci-app-dae
 - 包含 dae 主程序包（Makefile/init/UCI）+ LuCI UI（表单/所有节点/文本 三 Tab，含 group/订阅/路由/DNS/全局表单）
