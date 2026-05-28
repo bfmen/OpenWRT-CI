@@ -122,14 +122,22 @@ jobs:
       - name: Update Caches
         if: env.WRT_TEST != 'true'
         run: |
-          if [ -d "./wrt/staging_dir" ]; then
+          # 只有当上一次 Compile Toolchain 真的跑完(写了 sentinel)才相信
+          # restore 进来的 staging_dir。否则即使有 staging_dir 也可能是
+          # partial cache (历史 bug 或者编译被取消导致)，touch stamps 会
+          # 把 make 骗成"已完成"→ 又 save 一份 partial → 死循环。
+          # sentinel 路径在 staging_dir/host/ 下,这个目录在 toolchain
+          # cache (staging_dir/host*) 的路径范围内,所以会跟着 cache 走。
+          if [ -f "./wrt/staging_dir/host/.smart-cache-tc-complete" ]; then
             find "./wrt/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r DIR; do
               find "$DIR" -type f -exec touch {} +
             done
 
             mkdir -p ./wrt/tmp && echo "1" > ./wrt/tmp/.build
 
-            echo "toolchain skiped done!"
+            echo "✓ toolchain sentinel present — stamps touched, make will skip toolchain rebuild"
+          elif [ -d "./wrt/staging_dir" ]; then
+            echo "⚠ staging_dir restored but toolchain sentinel missing — partial cache suspected, will rebuild from scratch"
           else
             echo "caches missed!"
           fi
@@ -183,6 +191,13 @@ jobs:
 
           make tools/install -j$(nproc)     || make tools/install -j1 V=s
           make toolchain/install -j$(nproc) || make toolchain/install -j1 V=s
+
+          # 标记 toolchain 编译完成。只有两条 make 都返回 0 才会到这里 ——
+          # 这就是 Update Caches 步用来区分"完整 cache"和"partial cache"
+          # 的 sentinel。sentinel 在 staging_dir/host/ 下,会被 save-toolchain
+          # 一起存进 cache,下次 restore 后 Update Caches 能看到它。
+          mkdir -p staging_dir/host
+          touch staging_dir/host/.smart-cache-tc-complete
 
       - name: Save Toolchain Cache
         if: env.WRT_TEST != 'true' 
