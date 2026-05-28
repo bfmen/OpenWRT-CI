@@ -112,19 +112,12 @@ jobs:
         run: |
           find ./ -maxdepth 3 -type f -iregex ".*\(txt\|sh\)$" -exec dos2unix {} \; -exec chmod +x {} \;
 
-      - name: Check Caches
-        id: check-cache
+      - name: Restore Caches
+        id: cache
         if: env.WRT_TEST != 'true'
-        uses: actions/cache@main
+        uses: ysuolmai/openwrt-smart-cache/restore@v1
         with:
-          key: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_HASH}}
-          restore-keys: |
-            ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}
-            ${{contains(env.WRT_CONFIG, 'EMMC-WIFI-YES') && 'IPQ60XX-EMMC-WIFI-NO' || env.WRT_CONFIG}}-${{env.WRT_INFO}}
-          path: |
-            ./wrt/.ccache
-            ./wrt/staging_dir/host*
-            ./wrt/staging_dir/tool*
+          config-file: ./Config/${{env.WRT_CONFIG}}.txt
 
       - name: Update Caches
         if: env.WRT_TEST != 'true'
@@ -139,15 +132,6 @@ jobs:
             echo "toolchain skiped done!"
           else
             echo "caches missed!"
-          fi
-
-          if ${{steps.check-cache.outputs.cache-hit != 'true'}}; then
-            CACHE_LIST=$(gh cache list --key "$WRT_CONFIG-$WRT_INFO" | cut -f 1)
-            for CACHE_KEY in $CACHE_LIST; do
-              gh cache delete $CACHE_KEY
-            done
-
-            echo "caches cleanup done!"
           fi
 
       - name: Update Feeds
@@ -185,6 +169,39 @@ jobs:
           cd ./wrt/
 
           make download -j$(nproc)
+
+      - name: Save Dl Cache
+        if: env.WRT_TEST != 'true' && steps.cache.outputs.dl-hit != 'true'
+        uses: ysuolmai/openwrt-smart-cache/save-dl@v1
+        with:
+          cache-key: ${{steps.cache.outputs.dl-key}}
+
+      - name: Compile Toolchain
+        if: env.WRT_TEST != 'true'
+        run: |
+          cd ./wrt/
+
+          make tools/install -j$(nproc)     || make tools/install -j1 V=s
+          make toolchain/install -j$(nproc) || make toolchain/install -j1 V=s
+
+      - name: Save Toolchain Cache
+        if: env.WRT_TEST != 'true' && steps.cache.outputs.toolchain-hit != 'true'
+        uses: ysuolmai/openwrt-smart-cache/save-toolchain@v1
+        with:
+          cache-key: ${{steps.cache.outputs.toolchain-key}}
+
+      - name: Compile Packages
+        if: env.WRT_TEST != 'true'
+        run: |
+          cd ./wrt/
+
+          make package/compile -j$(nproc) || make package/compile -j1 V=s
+
+      - name: Save Staging Cache
+        if: env.WRT_TEST != 'true' && steps.cache.outputs.staging-hit != 'true'
+        uses: ysuolmai/openwrt-smart-cache/save-staging@v1
+        with:
+          cache-key: ${{steps.cache.outputs.staging-key}}
 
       - name: Compile Firmware
         if: env.WRT_TEST != 'true'
