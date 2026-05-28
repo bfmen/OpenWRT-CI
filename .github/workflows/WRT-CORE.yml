@@ -195,6 +195,10 @@ jobs:
         run: |
           cd ./wrt/
 
+          # 先编 target（kernel + DTB），否则 kmod 类包（gpio-button-hotplug
+          # / mtd-rw 等）找不到 linux-X.Y.Z/.config 会 fail。
+          # smart-cache README 的示例漏了这一步。
+          make target/compile -j$(nproc)  || make target/compile -j1 V=s
           make package/compile -j$(nproc) || make package/compile -j1 V=s
 
       - name: Save Staging Cache
