@@ -199,6 +199,20 @@ jobs:
           mkdir -p staging_dir/host
           touch staging_dir/host/.smart-cache-tc-complete
 
+          # 调试: 打印 toolchain cache 范围内各子目录的真实大小,确认
+          # smart-cache 的 path glob (staging_dir/host* + staging_dir/tool*)
+          # 是否真覆盖到 toolchain-*。如果看不到 toolchain-* 行,就是
+          # glob 没匹配上,要修 smart-cache 的 path。
+          echo "::group::staging_dir contents pre-save"
+          du -sh staging_dir/* 2>/dev/null | sort -h || true
+          echo "---host* glob 匹配:---"
+          ls -d staging_dir/host* 2>/dev/null || echo "  (none)"
+          echo "---tool* glob 匹配:---"
+          ls -d staging_dir/tool* 2>/dev/null || echo "  (none)"
+          echo "---.ccache 大小:---"
+          du -sh .ccache 2>/dev/null || echo "  (.ccache 不存在)"
+          echo "::endgroup::"
+
       - name: Save Toolchain Cache
         if: env.WRT_TEST != 'true' 
         uses: ysuolmai/openwrt-smart-cache/save-toolchain@v1
