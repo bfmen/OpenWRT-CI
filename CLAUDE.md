@@ -86,16 +86,18 @@ FIP / preloader 在独立仓库构建：<https://github.com/ysuolmai/UBOOT-CI>
 - **WireGuard 相关包已移除**（`kmod-wireguard`、`wireguard-tools`、`luci-proto-wireguard`）
 - Docker 相关：EMMC 设备才启用，MTK SPIM-NAND 设备不加
 
-## DAE 支持（IPQ60XX eMMC 设备）
+## DAE 支持（IPQ60XX eMMC + MTK filogic 设备）
 
-本项目在 QCA IPQ60XX eMMC 设备上额外提供基于 eBPF 的透明代理固件（dae）。
+本项目在 QCA IPQ60XX eMMC **以及** MTK filogic (MT7981B) 设备上额外提供基于 eBPF 的透明代理固件（dae）。
 
 ### 相关文件
 | 文件 | 说明 |
 |------|------|
-| `Scripts/diy.sh` 末尾 `[dae]` 块 | 从 `ysuolmai/luci-app-dae` clone 包，并扩大 eMMC 内核分区 |
-| `Config/IPQ60XX-DAE-EMMC-WIFI-YES.txt` | DAE 构建配置，含 WiFi |
-| `Config/IPQ60XX-DAE-EMMC-WIFI-NO.txt` | DAE 构建配置，无 WiFi |
+| `Scripts/diy.sh` 末尾 `[dae]` 块 | 从 `ysuolmai/luci-app-dae` clone 包，IPQ60XX 还扩大 eMMC 内核分区（MTK 用 UBI dynamic volume 无需）|
+| `Config/IPQ60XX-DAE-EMMC-WIFI-YES.txt` | QCA + DAE，含 WiFi（参考 IPQ60XX-EMMC-WIFI-YES 设备列表）|
+| `Config/IPQ60XX-DAE-EMMC-WIFI-NO.txt` | QCA + DAE，无 WiFi |
+| `Config/MTK-DAE-WIFI-YES.txt` | MTK filogic + DAE，含 WiFi（diy.sh 白名单过滤到 sx_7981r128 / nokia_ea0326gmp / cmcc_rax3000m）|
+| `Config/MTK-DAE-WIFI-NO.txt` | MTK filogic + DAE，无 WiFi（SuperGateway / Zyxel）|
 
 **dae 和 luci-app-dae 包独立维护**：https://github.com/ysuolmai/luci-app-dae
 - 包含 dae 主程序包（Makefile/init/UCI）+ LuCI UI（表单/所有节点/文本 三 Tab，含 group/订阅/路由/DNS/全局表单）
@@ -103,12 +105,19 @@ FIP / preloader 在独立仓库构建：<https://github.com/ysuolmai/UBOOT-CI>
 - **本仓库不需要锁定 luci-app-dae 版本**：每次 OpenWRT-CI 编译都自动拉最新 main → luci-app-dae 改一行 push，下次 OpenWRT-CI 编译就用上
 - 该仓库的 Claude 上下文文档：`luci-app-dae/CLAUDE.md`（迭代 UI/解析器时去那边看）
 
-### 与普通 EMMC 构建的区别
+### 与普通构建的区别
 - 内核开启 eBPF/BTF/XDP/Cgroup 相关选项
-- 启用 QCA SKB Recycler 内存优化
+- **QCA 平台**额外启用 SKB Recycler 内存优化（MTK 平台不加，QCA 专属）
 - **不包含** openclash / passwall（由 `diy.sh` 末尾 `[dae]` 块清除）
-- 内核分区从 6144k 扩大至 12288k（eBPF 编译产物更大）
-- 目标设备同 EMMC 白名单：`redmi_ax5-jdcloud`、`jdcloud_re-ss-01`、`jdcloud_re-cs-07`
+- **QCA EMMC** 内核分区从 6144k 扩大至 12288k（eBPF 编译产物更大；MTK UBI 自动伸缩无需）
+- QCA 目标设备：IPQ60XX EMMC 白名单（`redmi_ax5-jdcloud`、`jdcloud_re-ss-01`、`jdcloud_re-cs-07` 等）
+- MTK 目标设备：跟 MEDIATEK-WIFI-* 共用 diy.sh 第 0 节白名单（`sx_7981r128` 等 3 台）
+
+### 已知 trade-off（dae vs 硬件加速）
+- dae 用 eBPF 接管流量 → **绕过 QCA NSS / MTK WED 硬件加速**
+- 直连流量：A53@1.3-1.5GHz 软件转发 ~600-900 Mbps（千兆够用，2.5G 跑不满）
+- 代理流量：受加密单核制约 ~200 Mbps（任何透明代理都一样）
+- 实测：Redmi AX5 (IPQ60XX) 上 dae 跑通；sx_7981r128 (MT7981B) 待实测 WED 共存情况
 
 ## 常见问题
 
