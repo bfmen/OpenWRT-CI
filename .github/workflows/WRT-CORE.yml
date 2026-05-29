@@ -112,34 +112,40 @@ jobs:
         run: |
           find ./ -maxdepth 3 -type f -iregex ".*\(txt\|sh\)$" -exec dos2unix {} \; -exec chmod +x {} \;
 
-      - name: Restore Caches
-        id: cache
+      - name: Check Caches
+        id: check-cache
         if: env.WRT_TEST != 'true'
-        uses: ysuolmai/openwrt-smart-cache/restore@v1
+        uses: actions/cache@main
         with:
-          config-file: ./Config/${{env.WRT_CONFIG}}.txt
+          key: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_HASH}}
+          restore-keys: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}
+          path: |
+            ./wrt/.ccache
+            ./wrt/staging_dir/host*
+            ./wrt/staging_dir/tool*
 
       - name: Update Caches
         if: env.WRT_TEST != 'true'
         run: |
-          # 只有当上一次 Compile Toolchain 真的跑完(写了 sentinel)才相信
-          # restore 进来的 staging_dir。否则即使有 staging_dir 也可能是
-          # partial cache (历史 bug 或者编译被取消导致)，touch stamps 会
-          # 把 make 骗成"已完成"→ 又 save 一份 partial → 死循环。
-          # sentinel 路径在 staging_dir/host/ 下,这个目录在 toolchain
-          # cache (staging_dir/host*) 的路径范围内,所以会跟着 cache 走。
-          if [ -f "./wrt/staging_dir/host/.smart-cache-tc-complete" ]; then
+          if [ -d "./wrt/staging_dir" ]; then
             find "./wrt/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r DIR; do
               find "$DIR" -type f -exec touch {} +
             done
 
             mkdir -p ./wrt/tmp && echo "1" > ./wrt/tmp/.build
 
-            echo "✓ toolchain sentinel present — stamps touched, make will skip toolchain rebuild"
-          elif [ -d "./wrt/staging_dir" ]; then
-            echo "⚠ staging_dir restored but toolchain sentinel missing — partial cache suspected, will rebuild from scratch"
+            echo "toolchain skiped done!"
           else
             echo "caches missed!"
+          fi
+
+          if ${{steps.check-cache.outputs.cache-hit != 'true'}}; then
+            CACHE_LIST=$(gh cache list --key "$WRT_CONFIG-$WRT_INFO" | cut -f 1)
+            for CACHE_KEY in $CACHE_LIST; do
+              gh cache delete $CACHE_KEY
+            done
+
+            echo "caches cleanup done!"
           fi
 
       - name: Update Feeds
@@ -177,65 +183,6 @@ jobs:
           cd ./wrt/
 
           make download -j$(nproc)
-
-      - name: Save Dl Cache
-        if: env.WRT_TEST != 'true' 
-        uses: ysuolmai/openwrt-smart-cache/save-dl@v1
-        with:
-          cache-key: ${{steps.cache.outputs.dl-key}}
-
-      - name: Compile Toolchain
-        if: env.WRT_TEST != 'true'
-        run: |
-          cd ./wrt/
-
-          make tools/install -j$(nproc)     || make tools/install -j1 V=s
-          make toolchain/install -j$(nproc) || make toolchain/install -j1 V=s
-
-          # 标记 toolchain 编译完成。只有两条 make 都返回 0 才会到这里 ——
-          # 这就是 Update Caches 步用来区分"完整 cache"和"partial cache"
-          # 的 sentinel。sentinel 在 staging_dir/host/ 下,会被 save-toolchain
-          # 一起存进 cache,下次 restore 后 Update Caches 能看到它。
-          mkdir -p staging_dir/host
-          touch staging_dir/host/.smart-cache-tc-complete
-
-          # 调试: 打印 toolchain cache 范围内各目录的真实大小,verify
-          # smart-cache 的 5 个 path glob 都匹配到、内容齐全。
-          # 看 'staging_dir + build_dir + .ccache 总和' 和下一步 Save
-          # 上传的压缩 size,可以估出 zstd 压缩比是否合理。
-          echo "::group::cache contents pre-save"
-          echo "---staging_dir/* :---"
-          du -sh staging_dir/* 2>/dev/null | sort -h || true
-          echo "---build_dir/* (only host*/toolchain-* are cached):---"
-          du -sh build_dir/host* build_dir/toolchain-* 2>/dev/null | sort -h || true
-          echo "---.ccache:---"
-          du -sh .ccache 2>/dev/null || echo "  (.ccache 不存在)"
-          echo "---toolchain cache 总 raw size:---"
-          du -shc staging_dir/host* staging_dir/tool* build_dir/host* build_dir/toolchain-* .ccache 2>/dev/null | tail -1 || true
-          echo "::endgroup::"
-
-      - name: Save Toolchain Cache
-        if: env.WRT_TEST != 'true' 
-        uses: ysuolmai/openwrt-smart-cache/save-toolchain@v1
-        with:
-          cache-key: ${{steps.cache.outputs.toolchain-key}}
-
-      - name: Compile Packages
-        if: env.WRT_TEST != 'true'
-        run: |
-          cd ./wrt/
-
-          # 先编 target（kernel + DTB），否则 kmod 类包（gpio-button-hotplug
-          # / mtd-rw 等）找不到 linux-X.Y.Z/.config 会 fail。
-          # smart-cache README 的示例漏了这一步。
-          make target/compile -j$(nproc)  || make target/compile -j1 V=s
-          make package/compile -j$(nproc) || make package/compile -j1 V=s
-
-      - name: Save Staging Cache
-        if: env.WRT_TEST != 'true' 
-        uses: ysuolmai/openwrt-smart-cache/save-staging@v1
-        with:
-          cache-key: ${{steps.cache.outputs.staging-key}}
 
       - name: Compile Firmware
         if: env.WRT_TEST != 'true'
