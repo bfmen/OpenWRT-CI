@@ -677,7 +677,12 @@ if [[ "$WRT_CONFIG" == *"DAE"* ]]; then
     DAE_FEED_DIR="/tmp/luci-app-dae-feed"
     rm -rf "$DAE_FEED_DIR"
     if git clone --depth=1 https://github.com/ysuolmai/luci-app-dae "$DAE_FEED_DIR"; then
-        rm -rf package/dae package/luci-app-dae
+        # 上游 ImmortalWrt 的 feeds 自带 dae / luci-app-dae / luci-app-daed，
+        # 与我们的同名会撞，buildroot 可能编了上游那份。像 UPDATE_PACKAGE 一样
+        # 把 feeds 和 package 里所有同名包先全删干净，再放我们的。
+        find feeds/ package/ -maxdepth 4 -type d \
+            \( -name dae -o -name luci-app-dae -o -name luci-app-daed \) \
+            -exec rm -rf {} + 2>/dev/null
         cp -rf "$DAE_FEED_DIR/dae"          package/
         cp -rf "$DAE_FEED_DIR/luci-app-dae" package/
         echo "[dae] 已从 ysuolmai/luci-app-dae 拉取 dae + luci-app-dae"
