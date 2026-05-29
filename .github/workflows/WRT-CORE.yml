@@ -199,18 +199,19 @@ jobs:
           mkdir -p staging_dir/host
           touch staging_dir/host/.smart-cache-tc-complete
 
-          # 调试: 打印 toolchain cache 范围内各子目录的真实大小,确认
-          # smart-cache 的 path glob (staging_dir/host* + staging_dir/tool*)
-          # 是否真覆盖到 toolchain-*。如果看不到 toolchain-* 行,就是
-          # glob 没匹配上,要修 smart-cache 的 path。
-          echo "::group::staging_dir contents pre-save"
+          # 调试: 打印 toolchain cache 范围内各目录的真实大小,verify
+          # smart-cache 的 5 个 path glob 都匹配到、内容齐全。
+          # 看 'staging_dir + build_dir + .ccache 总和' 和下一步 Save
+          # 上传的压缩 size,可以估出 zstd 压缩比是否合理。
+          echo "::group::cache contents pre-save"
+          echo "---staging_dir/* :---"
           du -sh staging_dir/* 2>/dev/null | sort -h || true
-          echo "---host* glob 匹配:---"
-          ls -d staging_dir/host* 2>/dev/null || echo "  (none)"
-          echo "---tool* glob 匹配:---"
-          ls -d staging_dir/tool* 2>/dev/null || echo "  (none)"
-          echo "---.ccache 大小:---"
+          echo "---build_dir/* (only host*/toolchain-* are cached):---"
+          du -sh build_dir/host* build_dir/toolchain-* 2>/dev/null | sort -h || true
+          echo "---.ccache:---"
           du -sh .ccache 2>/dev/null || echo "  (.ccache 不存在)"
+          echo "---toolchain cache 总 raw size:---"
+          du -shc staging_dir/host* staging_dir/tool* build_dir/host* build_dir/toolchain-* .ccache 2>/dev/null | tail -1 || true
           echo "::endgroup::"
 
       - name: Save Toolchain Cache
