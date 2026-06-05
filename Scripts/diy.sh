@@ -377,6 +377,9 @@ fi
     "CONFIG_PACKAGE_luci-app-sqm=y"
     "CONFIG_PACKAGE_luci-i18n-sqm-zh-cn=y"
 )
+[[ $WRT_CONFIG == *"MEDIATEK"* || $WRT_CONFIG == *"MTK"* || $WRT_CONFIG == *"7981"* ]] && provided_config_lines+=(
+    "CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_sx_7981r128=y"
+)
 
 for line in "${provided_config_lines[@]}"; do
     echo "$line" >> .config
