@@ -301,6 +301,7 @@ provided_config_lines=(
     "CONFIG_PACKAGE_ttyd=y"
     "CONFIG_PACKAGE_luci-app-homeproxy=y"
     "CONFIG_PACKAGE_luci-i18n-homeproxy-zh-cn=y"
+    "CONFIG_PACKAGE_ddns-go=y"
     "CONFIG_PACKAGE_luci-app-ddns-go=y"
     "CONFIG_PACKAGE_luci-i18n-ddns-go-zh-cn=y"
     "CONFIG_PACKAGE_luci-app-argon-config=y"
@@ -532,10 +533,11 @@ if [ -f ./package/luci-app-store/Makefile ]; then
     sed -i -E 's/PKG_VERSION:=([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)/PKG_VERSION:=\1\nPKG_RELEASE:=\2/' ./package/luci-app-store/Makefile
 fi
 
-if [ -f ./package/luci-app-ddns-go/ddns-go/file/ddns-go.init ]; then
-    cp ${GITHUB_WORKSPACE}/Scripts/ddns-go.init ./package/luci-app-ddns-go/ddns-go/file/ddns-go.init
-    chmod +x ./package/luci-app-ddns-go/ddns-go/file/ddns-go.init
-    echo "ddns-go.init has been replaced successfully."
+if [ -d ./package/ddns-go/file ]; then
+    cp "${GITHUB_WORKSPACE}/Scripts/ddns-go.init" ./package/ddns-go/file/ddns-go.init
+    cp "${GITHUB_WORKSPACE}/Scripts/ddns-go.uci-default" ./package/ddns-go/file/luci-ddns-go.uci-default
+    chmod +x ./package/ddns-go/file/ddns-go.init ./package/ddns-go/file/luci-ddns-go.uci-default
+    echo "ddns-go init/defaults have been replaced successfully."
 fi
 
 RUST_FILE=$(find ./feeds/packages/ -maxdepth 3 -type f -wholename "*/rust/Makefile")
