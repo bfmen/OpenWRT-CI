@@ -205,8 +205,8 @@ UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
         luci-app-passwall smartdns luci-app-smartdns v2dat mosdns luci-app-mosdns \
         taskd luci-lib-xterm luci-lib-taskd luci-app-passwall2 \
         luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest \
-        luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky luci-app-openclash mihomo \
-        luci-app-nikki frp luci-app-ddns-go ddns-go docker dockerd" "kenzok8/jell" "main" "pkg"
+        luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky luci-app-openclash \
+        frp luci-app-ddns-go ddns-go docker dockerd" "kenzok8/jell" "main" "pkg"
 
 #speedtest
 UPDATE_PACKAGE "luci-app-netspeedtest" "https://github.com/sbwml/openwrt_pkgs.git" "main" "pkg"
@@ -323,6 +323,14 @@ provided_config_lines=(
     "CONFIG_PACKAGE_kmod-fs-cifs=y"
     "CONFIG_PACKAGE_cifsmount=y"
 	"CONFIG_PACKAGE_luci-theme-shadcn=y"
+	"CONFIG_PACKAGE_luci-app-passwall=y"
+    "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y"
+    "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Server=y"
+    "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR_Libev_Client=n"
+    "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Simple_Obfs=n"
+    "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_SingBox=n"
+    "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan_Plus=n"
+    "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Plugin=n"
 )
 
 if [[ $WRT_CONFIG == *"WIFI-NO"* ]]; then
@@ -342,14 +350,6 @@ fi
     "CONFIG_PACKAGE_luci-app-openlist2=y"
     "CONFIG_PACKAGE_luci-i18n-openlist2-zh-cn=y"
     "CONFIG_PACKAGE_ip6tables-nft=y"
-    "CONFIG_PACKAGE_luci-app-passwall=y"
-    "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y"
-    "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Server=y"
-    "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR_Libev_Client=n"
-    "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Simple_Obfs=n"
-    "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_SingBox=n"
-    "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan_Plus=n"
-    "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Plugin=n"
     "CONFIG_PACKAGE_htop=y"
     "CONFIG_PACKAGE_tcpdump=y"
     "CONFIG_PACKAGE_openssl-util=y"
@@ -371,6 +371,9 @@ fi
     "CONFIG_PACKAGE_kmod-sched-htb=y"
     "CONFIG_PACKAGE_tc-full=y"
     "CONFIG_PACKAGE_kmod-sched-netem=y"
+	"CONFIG_PACKAGE_nikki=y"
+	"CONFIG_PACKAGE_luci-app-nikki=y"
+	"CONFIG_PACKAGE_luci-i18n-nikki-zh-cn=y"
 )
 
 [[ $WRT_CONFIG == "IPQ"* ]] && provided_config_lines+=(
