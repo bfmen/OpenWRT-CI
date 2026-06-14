@@ -276,7 +276,7 @@ sed -i "/^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_/{
 
 keywords_to_delete=(
     "uugamebooster" "luci-app-wol" "luci-i18n-wol-zh-cn" "CONFIG_TARGET_INITRAMFS" "ddns" "luci-app-advancedplus" "mihomo" "nikki"
-    "smartdns" "kucat" "bootstrap" "luci-app-partexp" "luci-app-upnp"
+    "smartdns" "kucat" "bootstrap" "luci-app-partexp" "luci-app-upnp" "gecoosac" "diskmanager"
 )
 
 [[ $WRT_CONFIG == *"WIFI-NO"* ]] && keywords_to_delete+=("usb" "wpad" "hostapd")
@@ -322,10 +322,7 @@ provided_config_lines=(
     "CONFIG_PACKAGE_kmod-fs-cifs=y"
     "CONFIG_PACKAGE_cifsmount=y"
 	"CONFIG_PACKAGE_luci-theme-shadcn=y"
-	"CONFIG_PACKAGE_luci-app-ssr-plus=y"
-	"CONFIG_PACKAGE_shadowsocks-rust=y"
-	"CONFIG_PACKAGE_shadowsocksr-libev=y"
-	"CONFIG_PACKAGE_shadowsocks-libev=y"
+    "CONFIG_PACKAGE_luci-app-openclash=y"
 )
 
 if [[ $WRT_CONFIG == *"WIFI-NO"* ]]; then
@@ -338,6 +335,10 @@ if [[ "$WRT_CONFIG" != *"EMMC"* && "$WRT_CONFIG" == *"WIFI-NO"* ]]; then
 fi
 
 [[ $WRT_CONFIG == *"EMMC"* ]] && provided_config_lines+=(
+	"CONFIG_PACKAGE_luci-app-ssr-plus=y"
+	"CONFIG_PACKAGE_shadowsocks-rust=y"
+	"CONFIG_PACKAGE_shadowsocksr-libev=y"
+	"CONFIG_PACKAGE_shadowsocks-libev=y"
     "CONFIG_PACKAGE_luci-app-gecoosac=y"
 	"CONFIG_PACKAGE_luci-app-passwall=y"
     "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y"
@@ -369,7 +370,6 @@ fi
     "CONFIG_PACKAGE_kmod-veth=y"
     "CONFIG_PACKAGE_luci-app-frps=y"
     "CONFIG_PACKAGE_luci-app-samba4=y"
-    "CONFIG_PACKAGE_luci-app-openclash=y"
     "CONFIG_PACKAGE_libuver-zero=y"
     "CONFIG_PACKAGE_kmod-sched-tbf=y"
     "CONFIG_PACKAGE_kmod-sched-htb=y"
