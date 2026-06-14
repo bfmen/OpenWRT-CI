@@ -289,8 +289,6 @@ done
 provided_config_lines=(
     "CONFIG_PACKAGE_luci-app-zerotier=y"
     "CONFIG_PACKAGE_luci-i18n-zerotier-zh-cn=y"
-    "CONFIG_PACKAGE_luci-app-adguardhome=y"
-    "CONFIG_PACKAGE_luci-i18n-adguardhome-zh-cn=y"
     "CONFIG_PACKAGE_luci-app-poweroff=y"
     "CONFIG_PACKAGE_luci-i18n-poweroff-zh-cn=y"
     "CONFIG_PACKAGE_cpufreq=y"
@@ -304,9 +302,7 @@ provided_config_lines=(
     "CONFIG_PACKAGE_ddns-go=y"
     "CONFIG_PACKAGE_luci-app-ddns-go=y"
     "CONFIG_PACKAGE_luci-i18n-ddns-go-zh-cn=y"
-    "CONFIG_PACKAGE_luci-app-argon-config=y"
     "CONFIG_PACKAGE_nano=y"
-    "CONFIG_PACKAGE_luci-app-netspeedtest=y"
     "CONFIG_PACKAGE_luci-app-vlmcsd=y"
     "CONFIG_COREMARK_OPTIMIZE_O3=y"
     "CONFIG_COREMARK_ENABLE_MULTITHREADING=y"
@@ -317,7 +313,6 @@ provided_config_lines=(
     "CONFIG_OPKG_USE_CURL=y"
     "CONFIG_PACKAGE_opkg=y"
     "CONFIG_USE_APK=n"
-    "CONFIG_PACKAGE_luci-app-tailscale=y"
     "CONFIG_PACKAGE_luci-app-cifs-mount=y"
     "CONFIG_PACKAGE_kmod-fs-cifs=y"
     "CONFIG_PACKAGE_cifsmount=y"
@@ -335,6 +330,10 @@ if [[ "$WRT_CONFIG" != *"EMMC"* && "$WRT_CONFIG" == *"WIFI-NO"* ]]; then
 fi
 
 [[ $WRT_CONFIG == *"EMMC"* ]] && provided_config_lines+=(
+    "CONFIG_PACKAGE_luci-app-adguardhome=y"
+    "CONFIG_PACKAGE_luci-i18n-adguardhome-zh-cn=y"
+    "CONFIG_PACKAGE_luci-app-netspeedtest=y"
+    "CONFIG_PACKAGE_luci-app-tailscale=y"
 	"CONFIG_PACKAGE_luci-app-ssr-plus=y"
 	"CONFIG_PACKAGE_shadowsocks-rust=y"
 	"CONFIG_PACKAGE_shadowsocksr-libev=y"
