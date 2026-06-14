@@ -205,7 +205,7 @@ UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
         luci-app-passwall smartdns luci-app-smartdns v2dat mosdns luci-app-mosdns \
         taskd luci-lib-xterm luci-lib-taskd luci-app-passwall2 luci-app-ssr-plus shadowsocks-libev \
         luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest \
-        luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky luci-app-openclash \
+        luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky \
         frp luci-app-ddns-go ddns-go docker dockerd shadowsocks-rust" "kenzok8/jell" "main" "pkg"
 
 #speedtest
