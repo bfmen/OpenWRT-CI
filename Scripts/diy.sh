@@ -321,7 +321,7 @@ provided_config_lines=(
 )
 
 if [[ $WRT_CONFIG == *"WIFI-NO"* ]]; then
-    provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n")
+    provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n" "CONFIG_DRIVER_11AX_SUPPORT=y")
 fi
 
 if [[ "$WRT_CONFIG" != *"EMMC"* && "$WRT_CONFIG" == *"WIFI-NO"* ]]; then
