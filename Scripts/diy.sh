@@ -286,6 +286,25 @@ for keyword in "${keywords_to_delete[@]}"; do
     sed -i "/$keyword/d" ./.config
 done
 
+# =======================================================
+# [upstream-fix] hostapd MU-EDCA patch requires CONFIG_IEEE80211AX
+# No-WiFi builds can still compile wpad/hostapd as a dependency, but the
+# hidden DRIVER_11AX_SUPPORT symbol is not selected by any WiFi driver.
+# The upstream MU-EDCA patch then touches struct hostapd_config.he_mu_edca
+# while CONFIG_IEEE80211AX is disabled, which breaks wpad-full-openssl.
+# =======================================================
+if [[ "$WRT_CONFIG" == *"WIFI-NO"* ]]; then
+    HOSTAPD_PATCH_DIR="package/network/services/hostapd/patches"
+    if [ -d "$HOSTAPD_PATCH_DIR" ]; then
+        while IFS= read -r -d '' HOSTAPD_PATCH; do
+            if grep -q "he_mu_edca" "$HOSTAPD_PATCH"; then
+                echo "[upstream-fix] remove no-AX hostapd MU-EDCA patch: $HOSTAPD_PATCH"
+                rm -f "$HOSTAPD_PATCH"
+            fi
+        done < <(find "$HOSTAPD_PATCH_DIR" -type f -name "*.patch" -print0)
+    fi
+fi
+
 provided_config_lines=(
     "CONFIG_PACKAGE_luci-app-zerotier=y"
     "CONFIG_PACKAGE_luci-i18n-zerotier-zh-cn=y"
@@ -321,7 +340,7 @@ provided_config_lines=(
 )
 
 if [[ $WRT_CONFIG == *"WIFI-NO"* ]]; then
-    provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n" "CONFIG_DRIVER_11AX_SUPPORT=y")
+    provided_config_lines+=("CONFIG_PACKAGE_hostapd-common=n" "CONFIG_PACKAGE_wpad-openssl=n")
 fi
 
 if [[ "$WRT_CONFIG" != *"EMMC"* && "$WRT_CONFIG" == *"WIFI-NO"* ]]; then
