@@ -20,9 +20,10 @@ fi
 # 该设备不在 VIKINGYFY/immortalwrt 源码中，需要本 CI 注入
 # - DTS：Scripts/dts/mt7981b-sx-7981r128.dts
 # - 设备条目：追加到 target/linux/mediatek/image/filogic.mk
+# - board.d：注入网络/MAC/LED/升级校验，端口布局保留本仓库设定
 # - 仅 MTK 平台需要，其他平台（IPQ60XX/IPQ807X/Rockchip/x86）无影响
 # - FIP / BL2 / U-Boot 的构建在独立项目 https://github.com/ysuolmai/UBOOT-CI
-#   这里只产 sysupgrade.bin，不掺和 U-Boot
+#   这里只产 sysupgrade.bin / factory.bin，不掺和 U-Boot
 # =======================================================
 SX7981_DTS_SRC="${GITHUB_WORKSPACE}/Scripts/dts/mt7981b-sx-7981r128.dts"
 SX7981_FILOGIC_MK="target/linux/mediatek/image/filogic.mk"
@@ -45,20 +46,18 @@ define Device/sx_7981r128
   DEVICE_DTS := mt7981b-sx-7981r128
   DEVICE_DTS_DIR := ../dts
   DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware kmod-usb3 \
-                     kmod-sfp kmod-i2c-gpio
+                     kmod-sfp kmod-i2c-gpio automount f2fsck mkf2fs
   # 第一项 = 新 DTS 的 compatible 第一字段（运行时 board_name）
   # 第二项 = hanwckf 老固件 board name，允许从老固件直接 sysupgrade 过来
-  SUPPORTED_DEVICES := sx,7981r128 mediatek,mt7981-spim-snand-7981r128
+  # 第三项 = JimLee1996 rebase 仓库同硬件 board name，允许互刷 sysupgrade
+  SUPPORTED_DEVICES := sx,7981r128 mediatek,mt7981-spim-snand-7981r128 mediatek,zhao-7981r128-d
   KERNEL_IN_UBI := 1
-  UBOOTENV_IN_UBI := 1
   BLOCKSIZE := 128k
   PAGESIZE := 2048
-  IMAGE_SIZE := 65536k
+  IMAGE_SIZE := 114688k
   UBINIZE_OPTS := -E 5
-  # sysupgrade.bin = sysupgrade-tar（OpenWrt 通用升级包），
-  #                  既能在 OpenWrt 系统内 sysupgrade 升级，
-  #                  也能被 hanwckf 改的 U-Boot HTTP recovery 接受
-  IMAGES := sysupgrade.bin
+  IMAGES += factory.bin
+  IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE)
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
 endef
 TARGET_DEVICES += sx_7981r128
@@ -75,18 +74,47 @@ FILOGIC_EOF
     BOARD_NETWORK="target/linux/mediatek/filogic/base-files/etc/board.d/02_network"
     if [ -f "$BOARD_NETWORK" ] && ! grep -q 'sx,7981r128' "$BOARD_NETWORK"; then
         awk '
-            !done && /^\t\*\)$/ {
+            /^mediatek_setup_interfaces\(\)$/ { in_interfaces = 1 }
+            in_interfaces && !done && /^\t\*\)$/ {
                 print "\tsx,7981r128)"
                 print "\t\tucidef_set_interfaces_lan_wan \"lan1\" \"lan2\""
                 print "\t\t;;"
                 done = 1
             }
+            /^mediatek_setup_macs\(\)$/ { in_macs = 1 }
+            in_macs && !mac_done && /^\tesac$/ {
+                print "\tsx,7981r128)"
+                print "\t\tlan_mac=$(mtd_get_mac_binary factory 0x04)"
+                print "\t\t[ -n \"$lan_mac\" ] || lan_mac=$(mtd_get_mac_binary Factory 0x04)"
+                print "\t\twan_mac=$(macaddr_add \"$lan_mac\" 1)"
+                print "\t\tlabel_mac=$lan_mac"
+                print "\t\t;;"
+                mac_done = 1
+            }
             { print }
         ' "$BOARD_NETWORK" > "$BOARD_NETWORK.new" && mv "$BOARD_NETWORK.new" "$BOARD_NETWORK"
-        echo "[device-add]   02_network case 已注入"
+        echo "[device-add]   02_network 接口/MAC case 已注入"
     fi
 
-    # 4. 注入首次启动 uci-defaults
+    # 4. 注入 board.d/01_leds 配置
+    BOARD_LEDS="target/linux/mediatek/filogic/base-files/etc/board.d/01_leds"
+    if [ -f "$BOARD_LEDS" ] && ! grep -q 'sx,7981r128' "$BOARD_LEDS"; then
+        awk '
+            !done && /^esac$/ {
+                print "\tsx,7981r128)"
+                print "\t\tucidef_set_led_netdev \"lan2\" \"LAN2\" \"green:lan\" \"lan2\" \"link tx rx\""
+                print "\t\tucidef_set_led_netdev \"sfp\" \"SFP\" \"green:wan\" \"eth1\" \"link tx rx\""
+                print "\t\tucidef_set_led_netdev \"wlan2g\" \"WIFI2G\" \"green:wlan-2ghz\" \"phy0-ap0\" \"link tx rx\""
+                print "\t\tucidef_set_led_netdev \"wlan5g\" \"WIFI5G\" \"green:wlan-5ghz\" \"phy1-ap0\" \"link tx rx\""
+                print "\t\t;;"
+                done = 1
+            }
+            { print }
+        ' "$BOARD_LEDS" > "$BOARD_LEDS.new" && mv "$BOARD_LEDS.new" "$BOARD_LEDS"
+        echo "[device-add]   01_leds case 已注入"
+    fi
+
+    # 5. 注入首次启动 uci-defaults
     #    - 启用 WiFi（radio0/radio1 默认 disabled=1）
     #    - 添加 wan2 接口（eth1，SFP 笼，DHCP）并加入防火墙 WAN zone
     mkdir -p package/base-files/files/etc/uci-defaults
@@ -95,6 +123,9 @@ FILOGIC_EOF
 # 仅对 sx,7981r128 执行
 [ "$(cat /tmp/sysinfo/board_name 2>/dev/null)" = "sx,7981r128" ] || exit 0
 
+. /lib/functions.sh
+. /lib/functions/system.sh
+
 # --- WiFi：启用双频射频 ---
 uci set wireless.radio0.disabled=0
 uci set wireless.radio1.disabled=0
@@ -102,15 +133,24 @@ uci commit wireless
 
 # --- 网络：wan6（2.5G 主WAN，lan2，IPv6）+ wan2/wan2_6（SFP 笼，eth1）---
 # wan6 不由 ucidef_set_interfaces_lan_wan 自动创建，需手动补上
+uci set network.wan.metric=10
 uci set network.wan6=interface
 uci set network.wan6.device=lan2
 uci set network.wan6.proto=dhcpv6
+uci set network.wan6.metric=10
 uci set network.wan2=interface
 uci set network.wan2.device=eth1
 uci set network.wan2.proto=dhcp
+uci set network.wan2.metric=20
 uci set network.wan2_6=interface
 uci set network.wan2_6.device=eth1
 uci set network.wan2_6.proto=dhcpv6
+uci set network.wan2_6.metric=20
+base_mac=$(mtd_get_mac_binary factory 0x04 2>/dev/null)
+[ -n "$base_mac" ] || base_mac=$(mtd_get_mac_binary Factory 0x04 2>/dev/null)
+if [ -n "$base_mac" ]; then
+    uci set network.wan2.macaddr="$(macaddr_add "$base_mac" 2)"
+fi
 uci commit network
 
 # --- 防火墙：将 wan2 加入 WAN zone ---
@@ -129,20 +169,30 @@ if [ -n "$wan_zone_idx" ]; then
     uci commit firewall
 fi
 
-# --- LED：green:lan (GPIO 8) 绑定到 2.5G 物理口 lan2 ---
-# 实机点灯测试确认：green:lan 这颗物理 LED 位于 2.5G 网口旁
-uci add system led
-uci set system.@led[-1].name='led_lan2'
-uci set system.@led[-1].sysfs='green:lan'
-uci set system.@led[-1].trigger='netdev'
-uci set system.@led[-1].dev='lan2'
-uci set system.@led[-1].mode='link tx rx'
-uci commit system
-
 exit 0
 UCI_EOF
     chmod +x package/base-files/files/etc/uci-defaults/98_sx_7981r128_init.sh
     echo "[device-add]   uci-defaults 98_sx_7981r128_init.sh 已注入"
+
+    # 6. 注入 lib/upgrade/platform.sh 配置
+    #    参考 zhao_7981-r128-dsa-mtkuboot：sysupgrade-tar + ubi NAND 升级路径
+    PLATFORM_SH="target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh"
+    if [ -f "$PLATFORM_SH" ] && ! grep -q 'sx,7981r128' "$PLATFORM_SH"; then
+        awk '
+            /^platform_do_upgrade\(\) \{/ { in_upgrade = 1 }
+            in_upgrade && !upgrade_done && /^\t(jiorouter,ax6000-jidu6101|ruijie,rg-x30e-pro)\)$/ {
+                print "\tsx,7981r128|\\"
+                upgrade_done = 1
+            }
+            /^platform_check_image\(\) \{/ { in_upgrade = 0; in_check = 1 }
+            in_check && !check_done && /^\tnradio,c8-668gl\)$/ {
+                print "\tsx,7981r128|\\"
+                check_done = 1
+            }
+            { print }
+        ' "$PLATFORM_SH" > "$PLATFORM_SH.new" && mv "$PLATFORM_SH.new" "$PLATFORM_SH"
+        echo "[device-add]   platform.sh sysupgrade case 已注入"
+    fi
 
     echo "[device-add] 完成"
     echo "================================================================"

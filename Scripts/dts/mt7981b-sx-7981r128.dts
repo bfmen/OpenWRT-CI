@@ -5,11 +5,12 @@
  *
  * Changes vs original:
  *  - Include mt7981b.dtsi (replaces mt7981.dtsi from old fork)
- *  - Remove explicit memory/bootargs nodes (U-Boot passes via ATAG/DT)
  *  - LEDs: updated to use dt-bindings/leds/common.h macros
  *  - Switch: moved from inline mdio-bus inside &eth to &mdio_bus (DSA style)
  *  - NMBM: replaced nmbm_spim_nand wrapper with inline mediatek,nmbm properties
  *  - Added nvmem-layout in factory partition for WiFi EEPROM
+ *  - Added explicit 512MB memory, LED aliases, USB PHY, and MTK U-Boot layout
+ *    image assumptions following JimLee1996/immortalwrt-mt798x-rebase
  *  - Fixed spi-tx-bus-width / spi-rx-bus-width property names
  *  - Added spi-cal-* properties for NAND timing calibration
  *  - Removed &hnat (handled by kmod-mtk-hnat, no DT node needed in 6.18)
@@ -24,7 +25,11 @@
 
 /dts-v1/;
 
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/leds/common.h>
+#include <dt-bindings/pinctrl/mt65xx.h>
 #include "mt7981b.dtsi"
 
 / {
@@ -33,11 +38,20 @@
 
 	aliases {
 		label-mac-device = &gmac0;
+		led-boot = &led_power;
+		led-failsafe = &led_power;
+		led-running = &led_power;
+		led-upgrade = &led_power;
 		serial0 = &uart0;
 	};
 
 	chosen {
 		stdout-path = "serial0:115200n8";
+	};
+
+	memory@40000000 {
+		device_type = "memory";
+		reg = <0 0x40000000 0 0x20000000>;
 	};
 
 	gpio-keys {
@@ -53,33 +67,37 @@
 	gpio-leds {
 		compatible = "gpio-leds";
 
-		led-sfp {
+		led_sfp: led-sfp {
 			color = <LED_COLOR_ID_GREEN>;
 			function = LED_FUNCTION_WAN;
 			gpios = <&pio 4 GPIO_ACTIVE_LOW>;
+			default-state = "off";
 		};
 
-		led-wifi5g {
+		led_wifi5g: led-wifi5g {
 			color = <LED_COLOR_ID_GREEN>;
 			function = LED_FUNCTION_WLAN_5GHZ;
 			gpios = <&pio 5 GPIO_ACTIVE_LOW>;
+			default-state = "off";
 			linux,default-trigger = "phy1tpt";
 		};
 
-		led-wifi2g {
+		led_wifi2g: led-wifi2g {
 			color = <LED_COLOR_ID_GREEN>;
 			function = LED_FUNCTION_WLAN_2GHZ;
 			gpios = <&pio 6 GPIO_ACTIVE_LOW>;
+			default-state = "off";
 			linux,default-trigger = "phy0tpt";
 		};
 
-		led-lan {
+		led_lan: led-lan {
 			color = <LED_COLOR_ID_GREEN>;
 			function = LED_FUNCTION_LAN;
 			gpios = <&pio 8 GPIO_ACTIVE_LOW>;
+			default-state = "off";
 		};
 
-		led-power {
+		led_power: led-power {
 			color = <LED_COLOR_ID_GREEN>;
 			function = LED_FUNCTION_POWER;
 			gpios = <&pio 13 GPIO_ACTIVE_LOW>;
@@ -105,6 +123,24 @@
 		tx-disable-gpios = <&pio 12 GPIO_ACTIVE_HIGH>;
 		tx-fault-gpios = <&pio 34 GPIO_ACTIVE_HIGH>;
 		maximum-power-milliwatt = <3000>;
+	};
+
+	reg_3p3v: regulator-3p3v {
+		compatible = "regulator-fixed";
+		regulator-name = "fixed-3.3V";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-boot-on;
+		regulator-always-on;
+	};
+
+	usb_vbus: regulator-usb-vbus {
+		compatible = "regulator-fixed";
+		regulator-name = "usb_vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-boot-on;
 	};
 };
 
@@ -146,7 +182,7 @@
 		sfp = <&sfp_wan>;
 
 		nvmem-cell-names = "mac-address";
-		nvmem-cells = <&macaddr_factory 1>;
+		nvmem-cells = <&macaddr_factory 2>;
 	};
 };
 
@@ -264,7 +300,7 @@
 				reg = <0x100000 0x80000>;
 			};
 
-			partition@180000 {
+			factory: partition@180000 {
 				label = "factory";
 				reg = <0x180000 0x200000>;
 				read-only;
@@ -306,13 +342,19 @@
 };
 
 &wifi {
+	mediatek,mtd-eeprom = <&factory 0x0>;
 	nvmem-cell-names = "eeprom";
 	nvmem-cells = <&eeprom_factory>;
+	status = "okay";
+};
+
+&usb_phy {
 	status = "okay";
 };
 
 &xhci {
 	phys = <&u2port0 PHY_TYPE_USB2>,
 	       <&u3port0 PHY_TYPE_USB3>;
+	mediatek,u3p-dis-msk = <0x0>;
 	status = "okay";
 };

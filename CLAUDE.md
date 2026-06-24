@@ -41,7 +41,8 @@ eth1  → gmac1 → SFP 笼 → wan2（次要 WAN，uci-defaults 配置）
 0x100000 - 0x180000  u-boot-env (512KB)
 0x180000 - 0x380000  Factory    (2MB,   read-only)
 0x380000 - 0x580000  FIP        (2MB,   read-only)
-0x580000 - 末尾      UBI        (~122MB, kernel+rootfs)
+0x580000 - 0x7780000 UBI       (0x7200000 raw, IMAGE_SIZE=114688k)
+0x7780000 - 末尾      保留      (NMBM/坏块管理预留)
 ```
 
 ## 关键脚本说明
@@ -58,7 +59,7 @@ cat Config/*.txt >> .config
 | 节 | 内容 |
 |----|------|
 | [upstream-fix] | 删除上游格式损坏的 globitel patch（会导致 MT7981 uboot 编译失败） |
-| [device-add] | 注入 sx_7981r128：DTS 复制、filogic.mk 条目、02_network、uci-defaults |
+| [device-add] | 注入 sx_7981r128：DTS 复制、filogic.mk 条目、02_network、01_leds、platform.sh、uci-defaults |
 | UPDATE_PACKAGE | 安装/更新第三方包（poweroff、tailscale、gecoosac、openlist2、jell 批量、netspeedtest 等） |
 | provided_config_lines | 写入额外的 .config 配置项 |
 | pkg-fix 1/2/3 | iptables → kmod-nf-ipt/iptables-nft 依赖替换 |
@@ -69,10 +70,12 @@ cat Config/*.txt >> .config
 - 使用 `mt7981b.dtsi`（kernel 6.18 用）
 - 包含 spi-cal-* 校准属性
 - 内存节点: `<0 0x40000000 0 0x20000000>` = 512MB
+- gmac0 使用 factory MAC base，gmac1/SFP 使用 base+2，避免和 lan2 主 WAN 的 base+1 冲突
+- LED boot/failsafe/running/upgrade alias 绑定到 power LED
 
 ## sx_7981r128 FIP / U-Boot
 
-**本仓库只产 `sysupgrade.bin`（sysupgrade-tar），不掺和 U-Boot/FIP/BL2。**
+**本仓库产 OpenWrt 镜像 `sysupgrade.bin`（sysupgrade-tar）和 `factory.bin`（append-ubi），不掺和 U-Boot/FIP/BL2。**
 
 FIP / preloader 在独立仓库构建：<https://github.com/ysuolmai/UBOOT-CI>
 - 包含 ATF BL2 + U-Boot DTS + defconfig + defenvs
