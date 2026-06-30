@@ -21,12 +21,15 @@ fi
 # - DTS：Scripts/dts/mt7981b-sx-7981r128.dts
 # - 设备条目：追加到 target/linux/mediatek/image/filogic.mk
 # - board.d：注入网络/MAC/LED/升级校验，端口布局保留本仓库设定
+# - uboot-envtools / mtk-smp：跟进上游 zhao,7981r128 支持，文件存在时才注入
 # - 仅 MTK 平台需要，其他平台（IPQ60XX/IPQ807X/Rockchip/x86）无影响
 # - FIP / BL2 / U-Boot 的构建在独立项目 https://github.com/ysuolmai/UBOOT-CI
 #   这里只产 sysupgrade.bin / factory.bin，不掺和 U-Boot
 # =======================================================
 SX7981_DTS_SRC="${GITHUB_WORKSPACE}/Scripts/dts/mt7981b-sx-7981r128.dts"
 SX7981_FILOGIC_MK="target/linux/mediatek/image/filogic.mk"
+SX7981_UBOOT_ENVTOOLS="package/boot/uboot-tools/uboot-envtools/files/mediatek_filogic"
+SX7981_SMP_SH="package/mtk/applications/mtk-smp/files/smp.sh"
 
 if [ -f "$SX7981_DTS_SRC" ] && [ -d "target/linux/mediatek/dts" ]; then
     echo "================================================================"
@@ -46,11 +49,13 @@ define Device/sx_7981r128
   DEVICE_DTS := mt7981b-sx-7981r128
   DEVICE_DTS_DIR := ../dts
   DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware kmod-usb3 \
-                     kmod-sfp kmod-i2c-gpio automount f2fsck mkf2fs
+                     kmod-sfp kmod-i2c-gpio automount f2fsck mkf2fs uboot-envtools
   # 第一项 = 新 DTS 的 compatible 第一字段（运行时 board_name）
   # 第二项 = hanwckf 老固件 board name，允许从老固件直接 sysupgrade 过来
   # 第三项 = JimLee1996 rebase 仓库同硬件 board name，允许互刷 sysupgrade
-  SUPPORTED_DEVICES := sx,7981r128 mediatek,mt7981-spim-snand-7981r128 mediatek,zhao-7981r128-d
+  # 第四项 = 上游最终合并的 zhao,7981r128 board name，允许互刷 sysupgrade
+  SUPPORTED_DEVICES := sx,7981r128 mediatek,mt7981-spim-snand-7981r128 \
+                       mediatek,zhao-7981r128-d zhao,7981r128
   KERNEL_IN_UBI := 1
   BLOCKSIZE := 128k
   PAGESIZE := 2048
@@ -192,6 +197,40 @@ UCI_EOF
             { print }
         ' "$PLATFORM_SH" > "$PLATFORM_SH.new" && mv "$PLATFORM_SH.new" "$PLATFORM_SH"
         echo "[device-add]   platform.sh sysupgrade case 已注入"
+    fi
+
+    # 7. 注入 uboot-envtools 配置
+    #    上游 zhao,7981r128 使用 /dev/mtd1 0x0 0x20000 0x20000，sx 同硬件沿用。
+    if [ -f "$SX7981_UBOOT_ENVTOOLS" ] && ! grep -q 'sx,7981r128' "$SX7981_UBOOT_ENVTOOLS"; then
+        awk '
+            !done && /^[[:space:]]*zhao,7981r128\)$/ {
+                print "\tsx,7981r128|\\"
+                done = 1
+            }
+            !done && /^[[:space:]]*zbtlink,zbt-z8103ax\)$/ {
+                sub(/\)$/, "|\\")
+                print
+                print "\tsx,7981r128)"
+                done = 1
+                next
+            }
+            { print }
+        ' "$SX7981_UBOOT_ENVTOOLS" > "$SX7981_UBOOT_ENVTOOLS.new" && mv "$SX7981_UBOOT_ENVTOOLS.new" "$SX7981_UBOOT_ENVTOOLS"
+        echo "[device-add]   uboot-envtools case 已注入"
+    fi
+
+    # 8. 注入 mtk-smp 配置
+    #    MTK rebase 源存在该文件时，加入 7981R128 到 MT7981 WHNAT/SMP 分支。
+    if [ -f "$SX7981_SMP_SH" ] && ! grep -q 'sx,7981r128' "$SX7981_SMP_SH"; then
+        awk '
+            !done && /^\t\*7981\*\)$/ {
+                print "\tzhao,7981r128 |\\"
+                print "\tsx,7981r128 |\\"
+                done = 1
+            }
+            { print }
+        ' "$SX7981_SMP_SH" > "$SX7981_SMP_SH.new" && mv "$SX7981_SMP_SH.new" "$SX7981_SMP_SH"
+        echo "[device-add]   mtk-smp case 已注入"
     fi
 
     echo "[device-add] 完成"
