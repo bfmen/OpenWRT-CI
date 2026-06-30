@@ -426,6 +426,8 @@ provided_config_lines=(
     "CONFIG_PACKAGE_cifsmount=y"
 	"CONFIG_PACKAGE_luci-theme-shadcn=y"
     "CONFIG_PACKAGE_luci-app-openclash=y"
+    "CONFIG_PACKAGE_luci-app-mosdns=y"
+    "CONFIG_PACKAGE_luci-app-wolplus=y"
 )
 
 if [[ $WRT_CONFIG == *"WIFI-NO"* ]]; then
@@ -830,3 +832,16 @@ if [[ "$WRT_CONFIG" == *"DAE"* ]]; then
     echo "[dae] DAE 构建专项配置完成"
     echo "================================================================"
 fi
+
+#######################################
+# Fix PPP / UPnP issues
+#######################################
+mkdir -p package/base-files/files/etc/uci-defaults
+cat << 'EOF' > package/base-files/files/etc/uci-defaults/99-custom-fixes
+#!/bin/sh
+sed -i '8c maxfail 1' /etc/ppp/options
+sed -i '192c sleep 30' /lib/netifd/proto/ppp.sh
+sed -i '10c option external_ip "59.111.160.244"' /etc/config/upnpd
+exit 0
+EOF
+chmod +x package/base-files/files/etc/uci-defaults/99-custom-fixes
