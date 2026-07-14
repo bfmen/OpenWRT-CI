@@ -16,6 +16,8 @@ on:
         options:
           - IPQ60XX-WIFI-YES
           - IPQ60XX-WIFI-NO
+          - IPQ60XX-EMMC-WIFI-YES
+          - IPQ60XX-EMMC-WIFI-NO
           - IPQ807X-WIFI-YES
           - IPQ807X-WIFI-NO
           - MEDIATEK-WIFI-YES
