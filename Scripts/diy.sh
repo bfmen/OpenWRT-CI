@@ -295,7 +295,7 @@ UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
         taskd luci-lib-xterm luci-lib-taskd luci-app-passwall2 luci-app-ssr-plus shadowsocks-libev \
         luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest \
         luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky \
-        frp luci-app-ddns-go ddns-go docker dockerd shadowsocks-rust" "kenzok8/jell" "main" "pkg"
+        frp docker dockerd shadowsocks-rust" "kenzok8/jell" "main" "pkg"
 
 if [ -f ./package/frp/Makefile ]; then
     if ! grep -q 'files/$(2).init' ./package/frp/Makefile; then
@@ -668,14 +668,6 @@ if [ -f ./package/luci-app-quickstart/Makefile ]; then
 fi
 if [ -f ./package/luci-app-store/Makefile ]; then
     sed -i -E 's/PKG_VERSION:=([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)/PKG_VERSION:=\1\nPKG_RELEASE:=\2/' ./package/luci-app-store/Makefile
-fi
-
-if [ -d ./package/ddns-go/file ]; then
-    cp "${GITHUB_WORKSPACE}/Scripts/ddns-go.init" ./package/ddns-go/file/ddns-go.init
-    cp "${GITHUB_WORKSPACE}/Scripts/ddns-go.uci-default" ./package/ddns-go/file/luci-ddns-go.uci-default
-    chmod +x ./package/ddns-go/file/ddns-go.init ./package/ddns-go/file/luci-ddns-go.uci-default
-    install -Dm644 "${GITHUB_WORKSPACE}/Scripts/ddns-go.config" "package/base-files/files/etc/config/ddns-go"
-    echo "ddns-go init/defaults have been replaced successfully."
 fi
 
 RUST_FILE=$(find ./feeds/packages/ -maxdepth 3 -type f -wholename "*/rust/Makefile")
