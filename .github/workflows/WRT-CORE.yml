@@ -230,7 +230,19 @@ jobs:
             make clean -j$(nproc)
           fi
 
+      - name: Upload Firmware Artifact
+        id: artifact
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_BRANCH}}-${{env.WRT_DATE}}
+          path: ./wrt/upload/*.*
+          if-no-files-found: error
+          compression-level: 0
+
       - name: Release Firmware
+        id: release
+        continue-on-error: true
         uses: softprops/action-gh-release@master
         with:
           tag_name: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_BRANCH}}-${{env.WRT_DATE}}
@@ -257,3 +269,9 @@ jobs:
 
             内核版本：${{env.WRT_KVER}}
             插件列表：${{env.WRT_LIST}}
+
+      - name: Verify Firmware Delivery
+        if: always() && steps.artifact.outcome != 'success' && steps.release.outcome != 'success'
+        run: |
+          echo "::error::Artifact upload and GitHub Release both failed."
+          exit 1
