@@ -16,6 +16,26 @@ if [ -f "$BROKEN_UBOOT_PATCH" ]; then
 fi
 
 # =======================================================
+# [ddns-go] 使用路由器专用的 DDNS-GO 与原生 LuCI 管理界面
+# 必须在 feeds 和 Custom Packages 完成后执行，确保最终覆盖上游旧包。
+# =======================================================
+echo "[ddns-go] 替换上游 ddns-go 与 luci-app-ddns-go..."
+rm -rf package/ddns-go-suite
+
+DDNS_GO_SEARCH_ROOTS=(package)
+[ -d feeds/luci ] && DDNS_GO_SEARCH_ROOTS+=(feeds/luci)
+[ -d feeds/packages ] && DDNS_GO_SEARCH_ROOTS+=(feeds/packages)
+find "${DDNS_GO_SEARCH_ROOTS[@]}" -maxdepth 5 \
+    \( -type d -o -type l \) \
+    \( -name ddns-go -o -name luci-app-ddns-go \) \
+    -prune -exec rm -rf {} +
+
+git clone --depth=1 --single-branch --branch main \
+    https://github.com/ysuolmai/luci-app-ddns-go.git \
+    package/ddns-go-suite
+echo "[ddns-go] 自维护软件包已安装到 package/ddns-go-suite"
+
+# =======================================================
 # [device-add] 注入 SX 7981R128 设备支持
 # 该设备不在 VIKINGYFY/immortalwrt 源码中，需要本 CI 注入
 # - DTS：Scripts/dts/mt7981b-sx-7981r128.dts
