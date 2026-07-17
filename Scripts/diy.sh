@@ -315,30 +315,19 @@ UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
         taskd luci-lib-xterm luci-lib-taskd luci-app-passwall2 luci-app-ssr-plus shadowsocks-libev \
         luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest \
         netdata luci-app-netdata lucky luci-app-lucky \
-        frp docker dockerd shadowsocks-rust" "kenzok8/jell" "main" "pkg"
+        docker dockerd shadowsocks-rust" "kenzok8/jell" "main" "pkg"
 
-if [ -f ./package/frp/Makefile ]; then
-    if ! grep -q 'files/$(2).init' ./package/frp/Makefile; then
-        sed -i '/$(INSTALL_BIN) $(GO_PKG_BUILD_BIN_DIR)\/$(2) $(1)\/usr\/bin\//a \
-\	$(INSTALL_DIR) $(1)/etc/init.d/\
-\	$(INSTALL_BIN) ./files/$(2).init $(1)/etc/init.d/$(2)\
-\	$(INSTALL_DIR) $(1)/etc/config/\
-\	$(INSTALL_CONF) ./files/$(2).config $(1)/etc/config/$(2)' ./package/frp/Makefile
-    fi
-
-    for init_file in ./package/frp/files/frpc.init ./package/frp/files/frps.init; do
-        if [ -f "$init_file" ] && ! grep -q 'mkdir -p /var/etc' "$init_file"; then
-            sed -i '/local conf_file="\/var\/etc\/$NAME.ini"/a \	mkdir -p /var/etc' "$init_file"
-        fi
-    done
-
-    for config_file in ./package/frp/files/frpc.config ./package/frp/files/frps.config; do
-        [ -f "$config_file" ] || continue
-        sed -i 's/option user frpc/option user root/g; s/option group frpc/option group root/g; s/option user frps/option user root/g; s/option group frps/option group root/g' "$config_file"
-    done
-
-    echo "[diy] frp init scripts and UCI defaults will be installed into frpc/frps packages"
-fi
+# Self-maintained FRP binaries and LuCI applications. Remove both feed sources
+# and installed feed links before cloning the package collection.
+find feeds/luci feeds/packages package -maxdepth 5 \
+    \( -type d -o -type l \) \
+    \( -name frp -o -name luci-app-frpc -o -name luci-app-frps \) \
+    -prune -exec rm -rf {} + 2>/dev/null
+rm -rf package/ysuolmai-packages
+git clone --depth=1 --single-branch --branch main \
+    https://github.com/ysuolmai/openwrt-packages.git \
+    package/ysuolmai-packages
+echo "[diy] self-maintained frp/frpc/frps packages installed"
 
 #speedtest
 UPDATE_PACKAGE "luci-app-netspeedtest" "https://github.com/sbwml/openwrt_pkgs.git" "main" "pkg"
