@@ -314,7 +314,7 @@ UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
         luci-app-passwall smartdns luci-app-smartdns v2dat mosdns luci-app-mosdns \
         taskd luci-lib-xterm luci-lib-taskd luci-app-passwall2 luci-app-ssr-plus shadowsocks-libev \
         luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest \
-        luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky \
+        netdata luci-app-netdata lucky luci-app-lucky \
         frp docker dockerd shadowsocks-rust" "kenzok8/jell" "main" "pkg"
 
 if [ -f ./package/frp/Makefile ]; then
@@ -408,15 +408,18 @@ sed -i "/^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_/{
 
 keywords_to_delete=(
     "uugamebooster" "luci-app-wol" "luci-i18n-wol-zh-cn" "CONFIG_TARGET_INITRAMFS" "ddns" "luci-app-advancedplus" "mihomo" "nikki"
-    "smartdns" "kucat" "bootstrap" "luci-app-partexp" "luci-app-upnp" "gecoosac" "diskmanager"
+    "smartdns" "luci-app-partexp" "luci-app-upnp" "gecoosac" "diskmanager"
 )
 
 [[ $WRT_CONFIG == *"WIFI-NO"* ]] && keywords_to_delete+=("usb" "wpad" "hostapd")
-[[ $WRT_CONFIG != *"EMMC"* ]] && keywords_to_delete+=("samba" "autosamba" "disk" "aurora")
+[[ $WRT_CONFIG != *"EMMC"* ]] && keywords_to_delete+=("samba" "autosamba" "disk")
 
 for keyword in "${keywords_to_delete[@]}"; do
     sed -i "/$keyword/d" ./.config
 done
+
+# shadcn is the only supported LuCI theme.
+sed -i '/^CONFIG_PACKAGE_luci-theme-/d' ./.config
 
 # =======================================================
 # [upstream-fix] hostapd MU-EDCA patch requires CONFIG_IEEE80211AX
@@ -659,8 +662,6 @@ find ./ -name "cascade.less" -exec sed -i 's/#5e72e4/#31A1A1/g; s/#483d8b/#31A1A
 find ./ -name "dark.less" -exec sed -i 's/#5e72e4/#31A1A1/g; s/#483d8b/#31A1A1/g' {} \;
 
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_ttyd-nopass.sh" "package/base-files/files/etc/uci-defaults/99_ttyd-nopass"
-install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99_set_argon_primary" "package/base-files/files/etc/uci-defaults/99_set_argon_primary"
-
 install -Dm755 "${GITHUB_WORKSPACE}/Scripts/99-distfeeds.conf" "package/emortal/default-settings/files/99-distfeeds.conf"
 sed -i '/define Package\/default-settings\/install/a \
 \t$(INSTALL_DIR) $(1)/etc\n\t$(INSTALL_DATA) ./files/99-distfeeds.conf $(1)/etc/99-distfeeds.conf' \
