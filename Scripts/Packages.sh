@@ -69,8 +69,8 @@ UPDATE_PACKAGE "qmodem" "FUjr/QModem" "main"
 UPDATE_PACKAGE "quickfile" "sbwml/luci-app-quickfile" "main"
 UPDATE_PACKAGE "timecontrol" "sirpdboy/luci-app-timecontrol" "main"
 UPDATE_PACKAGE "viking" "VIKINGYFY/packages" "main" "" "axonhub gecoosac luci-app-timewol luci-app-wolplus luci-app-wolultra"
-# HomeProxy is supplied later by ysuolmai/openwrt-packages in diy.sh. Keep the
-# feeds-provided sing-box and discard VIKINGYFY's conflicting HomeProxy copy.
+# HomeProxy and its matching sing-box are supplied later by the maintained
+# ysuolmai/openwrt-packages collection in diy.sh.
 [ ! -d ./packages ] || find ./packages -maxdepth 3 -type d \( -iname '*homeproxy*' -o -iname '*sing-box*' \) -prune -exec rm -rf {} +
 UPDATE_PACKAGE "vnt" "lmq8267/luci-app-vnt" "main"
 
@@ -98,20 +98,8 @@ UPDATE_VERSION() {
 
 		local PKG_URL=$([[ "$OLD_URL" == *"releases"* ]] && echo "${OLD_URL%/}/$OLD_FILE" || echo "${OLD_URL%/}")
 
-		local NEW_TAG=${PKG_TAG#v}
-		local NEW_VER
-		local NEW_FILE=$OLD_FILE
-		local NEW_URL
-		if [[ "$PKG_MARK" == "true" && "$NEW_TAG" == *-* ]]; then
-			# Keep the upstream prerelease tag for the download URL, while using
-			# an OpenWrt-comparable version for package dependency checks.
-			NEW_VER=$(echo "$NEW_TAG" | sed -E 's/-alpha\.?/_alpha/; s/-beta\.?/_beta/; s/-rc\.?/_rc/')
-			NEW_FILE="${PKG_NAME}-${NEW_TAG}.tar.gz"
-			NEW_URL=$(echo "$OLD_URL" | sed "s/\$(PKG_VERSION)/$NEW_TAG/g; s/\$(PKG_NAME)/$PKG_NAME/g")
-		else
-			NEW_VER=$(echo "$NEW_TAG" | sed -E 's/[^0-9]+/\./g; s/^\.|\.$//g')
-			NEW_URL=$(echo "$PKG_URL" | sed "s/\$(PKG_VERSION)/$NEW_VER/g; s/\$(PKG_NAME)/$PKG_NAME/g")
-		fi
+		local NEW_VER=$(echo $PKG_TAG | sed -E 's/[^0-9]+/\./g; s/^\.|\.$//g')
+		local NEW_URL=$(echo $PKG_URL | sed "s/\$(PKG_VERSION)/$NEW_VER/g; s/\$(PKG_NAME)/$PKG_NAME/g")
 		local NEW_HASH=$(curl -sL "$NEW_URL" | sha256sum | cut -d ' ' -f 1)
 
 		echo "old version: $OLD_VER $OLD_HASH"
@@ -119,8 +107,6 @@ UPDATE_VERSION() {
 
 		if [[ "$NEW_VER" =~ ^[0-9].* ]] && dpkg --compare-versions "$OLD_VER" lt "$NEW_VER"; then
 			sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$NEW_VER/g" "$PKG_FILE"
-			sed -i "s|PKG_SOURCE:=.*|PKG_SOURCE:=$NEW_FILE|g" "$PKG_FILE"
-			sed -i "s|PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=$NEW_URL|g" "$PKG_FILE"
 			sed -i "s/PKG_HASH:=.*/PKG_HASH:=$NEW_HASH/g" "$PKG_FILE"
 			echo "$PKG_FILE version has been updated!"
 		else
@@ -130,10 +116,6 @@ UPDATE_VERSION() {
 }
 
 #UPDATE_VERSION "软件包名" "测试版，true，可选，默认为否"
-# HomeProxy in the maintained package collection requires the 1.14
-# architecture, which is currently published as a prerelease upstream.
-UPDATE_VERSION "sing-box" "true"
-
 #引入私有扩展脚本
 if [ -f "$GITHUB_WORKSPACE/Scripts/PRIVATE.sh" ]; then
 	source "$GITHUB_WORKSPACE/Scripts/PRIVATE.sh"
