@@ -116,7 +116,9 @@ UPDATE_VERSION() {
 }
 
 #UPDATE_VERSION "软件包名" "测试版，true，可选，默认为否"
-UPDATE_VERSION "sing-box"
+# HomeProxy in the maintained package collection requires the 1.14
+# architecture, which is currently published as a prerelease upstream.
+UPDATE_VERSION "sing-box" "true"
 
 #引入私有扩展脚本
 if [ -f "$GITHUB_WORKSPACE/Scripts/PRIVATE.sh" ]; then
