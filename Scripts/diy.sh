@@ -452,6 +452,9 @@ if [[ "$WRT_CONFIG" != *"EMMC"* && "$WRT_CONFIG" == *"WIFI-NO"* ]]; then
 fi
 
 [[ $WRT_CONFIG == *"EMMC"* ]] && provided_config_lines+=(
+    "CONFIG_PACKAGE_moontvplus=y"
+    "CONFIG_PACKAGE_luci-app-moontvplus=y"
+    "CONFIG_NODEJS_24=y"
     "CONFIG_PACKAGE_luci-app-adguardhome=y"
     "CONFIG_PACKAGE_luci-i18n-adguardhome-zh-cn=y"
     "CONFIG_PACKAGE_luci-app-netspeedtest=y"
