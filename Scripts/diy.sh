@@ -294,8 +294,12 @@ UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
         luci-app-passwall smartdns luci-app-smartdns v2dat mosdns luci-app-mosdns \
         taskd luci-lib-xterm luci-lib-taskd luci-app-passwall2 luci-app-ssr-plus shadowsocks-libev \
         luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest \
-        netdata luci-app-netdata lucky luci-app-lucky \
+        netdata luci-app-netdata \
         docker dockerd shadowsocks-rust" "kenzok8/jell" "main" "pkg"
+
+# jell's lucky package only installs the binary, while its LuCI app expects
+# /etc/config/lucky and /etc/init.d/lucky. Import the maintained pair together.
+UPDATE_PACKAGE "lucky luci-app-lucky" "sirpdboy/luci-app-lucky" "main" "pkg"
 
 # Self-maintained packages. Remove feed sources, installed feed links and
 # third-party collection copies before cloning our package collection.
