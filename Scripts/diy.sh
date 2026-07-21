@@ -301,6 +301,26 @@ UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
 # /etc/config/lucky and /etc/init.d/lucky. Import the maintained pair together.
 UPDATE_PACKAGE "lucky luci-app-lucky" "sirpdboy/luci-app-lucky" "main" "pkg"
 
+# Keep the installed app visible even if Lucky's UCI config is temporarily
+# missing or the LuCI menu cache is built before first-boot defaults run.
+LUCKY_MENU="package/luci-app-lucky/root/usr/share/luci/menu.d/luci-app-lucky.json"
+if [ -f "$LUCKY_MENU" ]; then
+    python3 - "$LUCKY_MENU" <<'PYEOF'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as source:
+    menu = json.load(source)
+
+menu.get("admin/services/lucky", {}).get("depends", {}).pop("uci", None)
+
+with open(path, "w", encoding="utf-8") as target:
+    json.dump(menu, target, ensure_ascii=False, indent=4)
+    target.write("\n")
+PYEOF
+fi
+
 # Self-maintained packages. Remove feed sources, installed feed links and
 # third-party collection copies before cloning our package collection.
 find feeds/luci feeds/packages package -maxdepth 5 \
