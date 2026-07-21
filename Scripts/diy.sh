@@ -501,6 +501,8 @@ fi
 	"CONFIG_PACKAGE_nikki=y"
 	"CONFIG_PACKAGE_luci-app-nikki=y"
 	"CONFIG_PACKAGE_luci-i18n-nikki-zh-cn=y"
+	"CONFIG_PACKAGE_luci-app-lucky=y"
+	"CONFIG_PACKAGE_lucky=y"
 )
 
 [[ $WRT_CONFIG == "IPQ"* ]] && provided_config_lines+=(
