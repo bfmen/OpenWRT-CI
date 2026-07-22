@@ -328,7 +328,8 @@ find feeds/luci feeds/packages package -maxdepth 5 \
     \( -name frp -o -name luci-app-frpc -o -name luci-app-frps \
        -o -name ddns-go -o -name luci-app-ddns-go \
        -o -name luci-app-adguardhome -o -name luci-theme-shadcn \
-       -o -name sing-box -o -name luci-app-homeproxy \) \
+       -o -name sing-box -o -name luci-app-homeproxy \
+       -o -name luci-app-nginx \) \
     -prune -exec rm -rf {} + 2>/dev/null
 rm -rf package/ysuolmai-packages
 git clone --depth=1 --single-branch --branch main \
@@ -478,6 +479,8 @@ fi
 [[ $WRT_CONFIG == *"EMMC"* ]] && provided_config_lines+=(
     "CONFIG_PACKAGE_moontvplus=y"
     "CONFIG_PACKAGE_luci-app-moontvplus=y"
+    "CONFIG_PACKAGE_luci-app-nginx=y"
+    "CONFIG_PACKAGE_luci-i18n-nginx-zh-cn=y"
     "CONFIG_PACKAGE_luci-app-adguardhome=y"
     "CONFIG_PACKAGE_luci-i18n-adguardhome-zh-cn=y"
     "CONFIG_PACKAGE_luci-app-netspeedtest=y"
