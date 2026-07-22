@@ -325,7 +325,7 @@ fi
 # third-party collection copies before cloning our package collection.
 find feeds/luci feeds/packages package -maxdepth 5 \
     \( -type d -o -type l \) \
-    \( -name frp -o -name luci-app-frpc -o -name luci-app-frps \
+    \( -name frp -o -name luci-app-frp -o -name luci-app-frpc -o -name luci-app-frps \
        -o -name ddns-go -o -name luci-app-ddns-go \
        -o -name luci-app-adguardhome -o -name luci-theme-shadcn \
        -o -name sing-box -o -name luci-app-homeproxy \
@@ -456,7 +456,7 @@ provided_config_lines=(
     "CONFIG_COREMARK_NUMBER_OF_THREADS=6"
     "CONFIG_PACKAGE_luci-app-filetransfer=y"
     "CONFIG_PACKAGE_openssh-sftp-server=y"
-    "CONFIG_PACKAGE_luci-app-frpc=y"
+    "CONFIG_PACKAGE_luci-app-frp=y"
     "CONFIG_OPKG_USE_CURL=y"
     "CONFIG_PACKAGE_opkg=y"
     "CONFIG_USE_APK=n"
@@ -518,7 +518,6 @@ fi
     "CONFIG_PACKAGE_kmod-nf-nat6=y"
     "CONFIG_PACKAGE_kmod-dummy=y"
     "CONFIG_PACKAGE_kmod-veth=y"
-    "CONFIG_PACKAGE_luci-app-frps=y"
     "CONFIG_PACKAGE_luci-app-samba4=y"
     "CONFIG_PACKAGE_libuver-zero=y"
     "CONFIG_PACKAGE_kmod-sched-tbf=y"
