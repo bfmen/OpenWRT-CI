@@ -277,7 +277,6 @@ UPDATE_PACKAGE() {
 }
 
 UPDATE_PACKAGE "luci-app-poweroff" "esirplayground/luci-app-poweroff" "main"
-UPDATE_PACKAGE "luci-app-tailscale" "asvow/luci-app-tailscale" "main"
 UPDATE_PACKAGE "openwrt-gecoosac" "ysuolmai/openwrt-gecoosac" "main"
 # gecoosac 上游作者 (kiss19776) 经常覆盖同名 release asset，PKG_HASH 跟不上
 # 把 PKG_HASH:=xxxxx 改成 PKG_HASH:=skip 跳过校验
@@ -329,7 +328,8 @@ find feeds/luci feeds/packages package -maxdepth 5 \
        -o -name ddns-go -o -name luci-app-ddns-go \
        -o -name luci-app-adguardhome -o -name luci-theme-shadcn \
        -o -name sing-box -o -name luci-app-homeproxy \
-       -o -name luci-app-nginx \) \
+       -o -name luci-app-nginx -o -name tailscale \
+       -o -name luci-app-tailscale -o -name luci-app-tailscale-community \) \
     -prune -exec rm -rf {} + 2>/dev/null
 rm -rf package/ysuolmai-packages
 git clone --depth=1 --single-branch --branch main \
@@ -340,8 +340,6 @@ echo "[diy] self-maintained package collection installed"
 #speedtest
 UPDATE_PACKAGE "luci-app-netspeedtest" "https://github.com/sbwml/openwrt_pkgs.git" "main" "pkg"
 UPDATE_PACKAGE "speedtest-cli" "https://github.com/sbwml/openwrt_pkgs.git" "main" "pkg"
-
-UPDATE_PACKAGE "luci-app-tailscale" "asvow/luci-app-tailscale" "main"
 
 UPDATE_PACKAGE "openwrt-podman" "https://github.com/breeze303/openwrt-podman" "main"
 UPDATE_PACKAGE "luci-app-quickfile" "https://github.com/sbwml/luci-app-quickfile" "main"
@@ -484,7 +482,9 @@ fi
     "CONFIG_PACKAGE_luci-app-adguardhome=y"
     "CONFIG_PACKAGE_luci-i18n-adguardhome-zh-cn=y"
     "CONFIG_PACKAGE_luci-app-netspeedtest=y"
-    "CONFIG_PACKAGE_luci-app-tailscale=y"
+    "CONFIG_PACKAGE_tailscale=y"
+    "CONFIG_PACKAGE_luci-app-tailscale-community=y"
+    "CONFIG_PACKAGE_luci-i18n-tailscale-community-zh-cn=y"
 	"CONFIG_PACKAGE_luci-app-ssr-plus=y"
 	"CONFIG_PACKAGE_shadowsocks-rust=y"
 	"CONFIG_PACKAGE_shadowsocksr-libev=y"
