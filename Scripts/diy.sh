@@ -294,7 +294,7 @@ UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
         taskd luci-lib-xterm luci-lib-taskd luci-app-passwall2 luci-app-ssr-plus shadowsocks-libev \
         luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest \
         netdata luci-app-netdata \
-        docker dockerd shadowsocks-rust" "kenzok8/jell" "main" "pkg"
+        docker shadowsocks-rust" "kenzok8/jell" "main" "pkg"
 
 # jell's lucky package only installs the binary, while its LuCI app expects
 # /etc/config/lucky and /etc/init.d/lucky. Import the maintained pair together.
@@ -329,7 +329,8 @@ find feeds/luci feeds/packages package -maxdepth 5 \
        -o -name luci-app-adguardhome -o -name luci-theme-shadcn \
        -o -name sing-box -o -name luci-app-homeproxy \
        -o -name luci-app-nginx -o -name tailscale \
-       -o -name luci-app-tailscale -o -name luci-app-tailscale-community \) \
+       -o -name luci-app-tailscale -o -name luci-app-tailscale-community \
+       -o -name dockerd -o -name luci-app-dockerman \) \
     -prune -exec rm -rf {} + 2>/dev/null
 rm -rf package/ysuolmai-packages
 git clone --depth=1 --single-branch --branch main \
@@ -699,7 +700,7 @@ fi
 
 
 # =======================================================
-# 解决 opkg 报错：正确补齐 dockerman 及其依赖
+# 使用自维护的原生 nftables Dockerman，并补齐 luci-lib-docker
 # =======================================================
 echo "Handling Docker dependencies..."
 
@@ -708,10 +709,10 @@ rm -rf package/feeds/luci/luci-lib-docker
 rm -rf package/luci-app-dockerman
 rm -rf package/luci-lib-docker
 
-echo "Cloning luci-app-dockerman..."
-git clone --depth 1 https://github.com/lisaac/luci-app-dockerman.git temp_dockerman
-mv temp_dockerman/applications/luci-app-dockerman package/luci-app-dockerman
-rm -rf temp_dockerman
+if [ ! -f package/ysuolmai-packages/luci-app-dockerman/Makefile ]; then
+    echo "错误: 自维护 luci-app-dockerman 未找到"
+    exit 1
+fi
 
 echo "Cloning luci-lib-docker..."
 git clone --depth 1 https://github.com/lisaac/luci-lib-docker.git temp_libdocker
@@ -721,12 +722,6 @@ else
     mv temp_libdocker package/luci-lib-docker
 fi
 rm -rf temp_libdocker
-
-if [ -f "package/luci-app-dockerman/Makefile" ]; then
-    echo "Removing cgroupfs-mount dependency..."
-    sed -i 's/+cgroupfs-mount //g' package/luci-app-dockerman/Makefile
-    sed -i 's/+cgroupfs-mount//g' package/luci-app-dockerman/Makefile
-fi
 
 ./scripts/feeds install ttyd
 ./scripts/feeds install luci-lib-docker
