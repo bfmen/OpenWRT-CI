@@ -499,8 +499,10 @@ fi
     "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_SingBox=n"
     "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan_Plus=n"
     "CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Plugin=n"
-    "CONFIG_PACKAGE_luci-app-docker=y"
-    "CONFIG_PACKAGE_luci-i18n-docker-zh-cn=y"
+    # luci-app-docker installs a competing S25docker service which starts
+    # dockerd without the maintained daemon configuration.
+    "CONFIG_PACKAGE_luci-app-docker=n"
+    "CONFIG_PACKAGE_luci-i18n-docker-zh-cn=n"
     "CONFIG_PACKAGE_luci-app-dockerman=y"
     "CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y"
     "CONFIG_PACKAGE_luci-app-openlist2=y"
