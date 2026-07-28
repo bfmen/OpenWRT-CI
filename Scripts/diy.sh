@@ -277,13 +277,13 @@ UPDATE_PACKAGE() {
 }
 
 UPDATE_PACKAGE "luci-app-poweroff" "esirplayground/luci-app-poweroff" "main"
-UPDATE_PACKAGE "openwrt-gecoosac" "ysuolmai/openwrt-gecoosac" "main"
+#UPDATE_PACKAGE "openwrt-gecoosac" "ysuolmai/openwrt-gecoosac" "main"
 # gecoosac 上游作者 (kiss19776) 经常覆盖同名 release asset，PKG_HASH 跟不上
 # 把 PKG_HASH:=xxxxx 改成 PKG_HASH:=skip 跳过校验
-if [ -f ./package/openwrt-gecoosac/gecoosac/Makefile ]; then
-    sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' ./package/openwrt-gecoosac/gecoosac/Makefile
-    echo "[diy] openwrt-gecoosac PKG_HASH 设为 skip"
-fi
+#if [ -f ./package/openwrt-gecoosac/gecoosac/Makefile ]; then
+#    sed -i 's/^PKG_HASH:=.*/PKG_HASH:=skip/' ./package/openwrt-gecoosac/gecoosac/Makefile
+#    echo "[diy] openwrt-gecoosac PKG_HASH 设为 skip"
+#fi
 UPDATE_PACKAGE "luci-app-openlist2" "sbwml/luci-app-openlist2" "main"
 
 #small-package
@@ -400,7 +400,7 @@ sed -i "/^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_/{
 
 keywords_to_delete=(
     "uugamebooster" "luci-app-wol" "luci-i18n-wol-zh-cn" "CONFIG_TARGET_INITRAMFS" "ddns" "luci-app-advancedplus" "mihomo" "nikki"
-    "smartdns" "luci-app-partexp" "luci-app-upnp" "gecoosac" "diskmanager"
+    "smartdns" "luci-app-partexp" "luci-app-upnp" "diskmanager"
 )
 
 [[ $WRT_CONFIG == *"WIFI-NO"* ]] && keywords_to_delete+=("usb" "wpad" "hostapd")
