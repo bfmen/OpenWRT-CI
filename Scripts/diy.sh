@@ -532,6 +532,41 @@ fi
 	#"CONFIG_PACKAGE_luci-i18n-nikki-zh-cn=y"
 	#"CONFIG_PACKAGE_luci-app-lucky=y"
 	#"CONFIG_PACKAGE_lucky=y"
+	# =========================
+    # [Travel Router]
+    # 经常出差使用，酒店/机场 WiFi
+    # =========================
+    "CONFIG_PACKAGE_travelmate=y"
+    "CONFIG_PACKAGE_luci-app-travelmate=y"
+
+    # =========================
+    # [Travel Router Tools]
+    # =========================
+    "CONFIG_PACKAGE_bind-dig=y"
+    "CONFIG_PACKAGE_bind-host=y"
+    "CONFIG_PACKAGE_drill=y"
+    "CONFIG_PACKAGE_dnslookup=y"
+
+    "CONFIG_PACKAGE_iperf3=y"
+    "CONFIG_PACKAGE_mtr=y"
+    "CONFIG_PACKAGE_arping=y"
+    "CONFIG_PACKAGE_ethtool=y"
+
+    "CONFIG_PACKAGE_screen=y"
+    "CONFIG_PACKAGE_tmux=y"
+
+    "CONFIG_PACKAGE_tree=y"
+    "CONFIG_PACKAGE_file=y"
+    "CONFIG_PACKAGE_bc=y"
+
+    "CONFIG_PACKAGE_watchcat=y"
+    "CONFIG_PACKAGE_luci-app-watchcat=y"
+
+    "CONFIG_PACKAGE_vnstat2=y"
+
+    "CONFIG_PACKAGE_curl=y"
+
+    "CONFIG_PACKAGE_lsblk=y"
 )
 
 [[ $WRT_CONFIG == "IPQ"* ]] && provided_config_lines+=(
