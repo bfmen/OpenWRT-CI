@@ -116,8 +116,10 @@ jobs:
         if: env.WRT_TEST != 'true'
         uses: actions/cache@main
         with:
-          key: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_HASH}}
-          restore-keys: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}
+          # Host tools and toolchains are tied to the exact source revision.
+          # Restoring them across revisions can mix incompatible gnulib/gettext
+          # headers and produce failures such as a missing stdcountof.h.
+          key: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-build-v2-${{env.WRT_HASH}}
           path: |
             ./wrt/.ccache
             ./wrt/staging_dir/host*
