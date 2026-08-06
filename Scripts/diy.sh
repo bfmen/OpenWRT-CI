@@ -296,6 +296,13 @@ UPDATE_PACKAGE "xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
         netdata luci-app-netdata \
         docker shadowsocks-rust" "kenzok8/jell" "main" "pkg"
 
+# tcping 0.5 intermittently fails when its two objects are built in parallel.
+# Keep this package serial while the rest of the firmware build stays parallel.
+TCPING_MAKEFILE="package/tcping/Makefile"
+if [ -f "$TCPING_MAKEFILE" ]; then
+	sed -i 's/^PKG_BUILD_PARALLEL:=1$/PKG_BUILD_PARALLEL:=0/' "$TCPING_MAKEFILE"
+fi
+
 # jell's lucky package only installs the binary, while its LuCI app expects
 # /etc/config/lucky and /etc/init.d/lucky. Import the maintained pair together.
 UPDATE_PACKAGE "lucky luci-app-lucky" "sirpdboy/luci-app-lucky" "main" "pkg"
