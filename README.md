@@ -2,6 +2,10 @@
 
 https://sc.350303.xyz/register?aff=C8X8NEL4BXX6
 
+# 本地编译器
+
+https://github.com/VIKINGYFY/OWRT-Tools.git
+
 # OpenWRT-CI
 
 官方版：
