@@ -897,11 +897,70 @@ if [[ "$WRT_CONFIG" == *"DAE"* ]]; then
         echo "[dae] 警告：clone luci-app-dae 失败，跳过（构建将失败）"
     fi
 
-    # 1. 移除 openclash 和 passwall（dae 是唯一透明代理，避免冲突）
+    # 1. 拉取 Honk 完整 feed，保留 locks/ 和 .cache/ 供 package/honk 使用
+    #    Honk 是 dae 的 eBPF 透明代理替代方案，只有 DAE 固件启用。
+    HONK_FEED_DIR="package/openwrt-honk"
+    rm -rf "$HONK_FEED_DIR"
+    find feeds/ package/ -maxdepth 5 \
+        \( -type d -o -type l \) \
+        \( -name honk -o -name luci-app-honk -o -name luci-app-honk-legacy \) \
+        -exec rm -rf {} + 2>/dev/null
+
+    if ! git clone --depth=1 --single-branch --branch main \
+        https://github.com/breeze303/openwrt-honk.git "$HONK_FEED_DIR"; then
+        echo "[honk] 错误：clone openwrt-honk 失败"
+        exit 1
+    fi
+
+    # Honk 的 Makefile 从仓库相邻目录读取锁定的 GeoIP/GeoSite 资源。
+    # 从 geo.lock.json 解析 URL 和 SHA256，避免 diy.sh 与插件仓库重复维护版本。
+    mapfile -t HONK_GEO_ASSETS < <(
+        python3 - "$HONK_FEED_DIR/locks/geo.lock.json" <<'PYEOF'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    lock = json.load(source)
+
+for asset in lock.get("assets", []):
+    print("\t".join((asset["cachePath"], asset["sourceUrl"], asset["sha256"])))
+PYEOF
+    )
+
+    if [ "${#HONK_GEO_ASSETS[@]}" -eq 0 ]; then
+        echo "[honk] 错误：geo.lock.json 未包含任何 Geo 资源"
+        exit 1
+    fi
+
+    for HONK_GEO_ASSET in "${HONK_GEO_ASSETS[@]}"; do
+        IFS=$'\t' read -r HONK_GEO_PATH HONK_GEO_URL HONK_GEO_SHA256 <<< "$HONK_GEO_ASSET"
+        HONK_GEO_FILE="$HONK_FEED_DIR/$HONK_GEO_PATH"
+        mkdir -p "$(dirname "$HONK_GEO_FILE")"
+
+        echo "[honk] 下载并校验 $(basename "$HONK_GEO_FILE")"
+        if ! curl --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
+            --output "$HONK_GEO_FILE" "$HONK_GEO_URL"; then
+            echo "[honk] 错误：下载 Geo 资源失败 $HONK_GEO_URL"
+            exit 1
+        fi
+        if ! printf '%s  %s\n' "$HONK_GEO_SHA256" "$HONK_GEO_FILE" | sha256sum -c -; then
+            echo "[honk] 错误：Geo 资源校验失败 $HONK_GEO_FILE"
+            exit 1
+        fi
+    done
+
+    # Honk 新版 LuCI 页面依赖 honk 引擎；legacy 页面保留在仓库中但不打入固件。
+    for HONK_PACKAGE in honk luci-app-honk; do
+        sed -i -E "/^(CONFIG_PACKAGE_${HONK_PACKAGE}=|# CONFIG_PACKAGE_${HONK_PACKAGE} is not set)/d" .config
+        echo "CONFIG_PACKAGE_${HONK_PACKAGE}=y" >> .config
+    done
+    echo "[honk] 已启用 honk + luci-app-honk"
+
+    # 2. 移除 openclash 和 passwall（dae/Honk 是唯一透明代理，避免冲突）
     sed -i '/openclash/d; /passwall/d' .config
     echo "[dae] 已从 .config 移除 openclash / passwall 相关行"
 
-    # 2. 扩大 eMMC 设备内核分区
+    # 3. 扩大 eMMC 设备内核分区
     #    dae 包含 eBPF 字节码，编译产物比普通代理大，默认 6144k 不够
     image_file='./target/linux/qualcommax/image/ipq60xx.mk'
     if [ -f "$image_file" ]; then

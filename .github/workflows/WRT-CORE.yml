@@ -77,6 +77,9 @@ jobs:
           sudo -E apt -yqq autoclean
           sudo -E apt -yqq clean
           sudo -E apt -yqq install dos2unix libfuse-dev libxml2
+          if [[ "${WRT_CONFIG}" == *"DAE"* ]]; then
+            sudo -E apt -yqq install clang llvm libbpf-dev libclang-dev pkg-config cmake zstd
+          fi
           sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
           sudo -E systemctl daemon-reload
           sudo -E timedatectl set-timezone "Asia/Shanghai"
@@ -175,6 +178,40 @@ jobs:
 
           $GITHUB_WORKSPACE/Scripts/Settings.sh
           $GITHUB_WORKSPACE/Scripts/diy.sh
+
+          if [[ "${WRT_CONFIG}" == *"DAE"* ]]; then
+            HONK_BPF_RUST_TOOLCHAIN=$(sed -n 's/^BPF_RUST_TOOLCHAIN?=//p' package/openwrt-honk/honk/Makefile | head -n 1)
+            HONK_BPF_LINKER_VERSION=$(sed -n 's/^readonly bpf_linker_version=.*:-\([^}]*\)}$/\1/p' package/openwrt-honk/.github/scripts/build-packages-in-sdk.sh | head -n 1)
+            HONK_BPF_LINKER_SHA256=$(sed -n 's/^readonly bpf_linker_sha256=.*:-\([^}]*\)}$/\1/p' package/openwrt-honk/.github/scripts/build-packages-in-sdk.sh | head -n 1)
+            if [ -z "$HONK_BPF_RUST_TOOLCHAIN" ] || [ -z "$HONK_BPF_LINKER_VERSION" ] || [ -z "$HONK_BPF_LINKER_SHA256" ]; then
+              echo "无法从 openwrt-honk 读取 BPF 构建工具版本"
+              exit 1
+            fi
+
+            export PATH="$HOME/.cargo/bin:$PATH"
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            if ! command -v rustup >/dev/null 2>&1; then
+              curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+                --location --retry 5 --retry-all-errors --retry-delay 2 \
+                https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+            fi
+            rustup toolchain install "$HONK_BPF_RUST_TOOLCHAIN" --profile minimal --component rust-src
+
+            if ! command -v bpf-linker >/dev/null 2>&1 || \
+              ! bpf-linker --version | grep -q "$HONK_BPF_LINKER_VERSION"; then
+              HONK_BPF_LINKER_ARCHIVE=$(mktemp)
+              trap 'rm -f "$HONK_BPF_LINKER_ARCHIVE"' EXIT
+              curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+                --location --retry 5 --retry-all-errors --retry-delay 2 \
+                --output "$HONK_BPF_LINKER_ARCHIVE" \
+                "https://github.com/aya-rs/bpf-linker/releases/download/v${HONK_BPF_LINKER_VERSION}/bpf-linker-x86_64-unknown-linux-musl.tar.zst"
+              printf '%s  %s\n' "$HONK_BPF_LINKER_SHA256" "$HONK_BPF_LINKER_ARCHIVE" | sha256sum -c -
+              mkdir -p "$HOME/.cargo/bin"
+              tar --zstd -xf "$HONK_BPF_LINKER_ARCHIVE" -C "$HOME/.cargo/bin"
+              chmod +x "$HOME/.cargo/bin/bpf-linker"
+            fi
+            bpf-linker --version
+          fi
           
           make defconfig -j$(nproc) && make clean -j$(nproc)
 
