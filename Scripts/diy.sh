@@ -389,19 +389,20 @@ else
     keep_pattern="\(redmi_ax5\|qihoo_360v6\|redmi_ax5-jdcloud\|zn_m2\|jdcloud_re-ss-01\|jdcloud_re-cs-07\)=y$"
 fi
 
+# 使用标准的 "is not set" 注释，避免后面的 make defconfig 重新启用默认设备。
 sed -i "/^CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_/{
-    /$keep_pattern/!d
+    /$keep_pattern/! s/^CONFIG_\([^=]*\)=.*/# CONFIG_\1 is not set/
 }" ./.config
 
 
 # MTK 设备白名单——只保留这里列出的设备，其他 MEDIATEK-WIFI-{YES,NO}.txt
-# 里的设备一律从 .config 删掉，避免无意义编译。
+# 里的设备一律显式设为 not set，避免 make defconfig 恢复默认设备。
 # 想多编几个设备就往 mtk_keep 里加（用 \| 分隔），名字对应
 # Config/MEDIATEK-WIFI-*.txt 里 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_xxx 的 xxx。
 mtk_keep="\(sx_7981r128\|nokia_ea0326gmp\|cmcc_rax3000m\)=y$"
 
 sed -i "/^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_/{
-    /$mtk_keep/!d
+    /$mtk_keep/! s/^CONFIG_\([^=]*\)=.*/# CONFIG_\1 is not set/
 }" ./.config
 
 
