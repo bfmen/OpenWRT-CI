@@ -871,6 +871,24 @@ done < <(find target/linux/generic/ target/linux/qualcommax/ -name "config-*" -p
 echo "[kernel-fix] 完成。"
 
 # =======================================================
+# [qca-fix] 清理 GL-AX1800 DTS 中失效的 MAC NVMEM 引用
+# 当前 qualcommax 源码的 ipq6018-ess.dtsi 没有提供 macaddr_wan/
+# macaddr_lan 标签，但 ipq6000-gl-ax1800.dts 仍引用它们，导致 DTC
+# 在所有包含 GL-AX1800 镜像的 QCA 构建中直接失败。
+# =======================================================
+QCA_AX1800_DTS="target/linux/qualcommax/dts/ipq6000-gl-ax1800.dts"
+if [ -f "$QCA_AX1800_DTS" ] && \
+   grep -qE 'nvmem-cells = <&macaddr_(wan|lan)>;' "$QCA_AX1800_DTS" && \
+   ! grep -RqsE '^[[:space:]]*macaddr_(wan|lan):' \
+       target/linux/qualcommax/dts target/linux/qualcommax/files 2>/dev/null; then
+    sed -i -E \
+        -e '/^[[:space:]]*nvmem-cells = <&macaddr_(wan|lan)>;/d' \
+        -e '/^[[:space:]]*nvmem-cell-names = "mac-address";/d' \
+        "$QCA_AX1800_DTS"
+    echo "[qca-fix] 已移除 GL-AX1800 中无对应 provider 的 macaddr NVMEM 引用"
+fi
+
+# =======================================================
 # [dae] DAE 构建专项处理
 # 仅当 WRT_CONFIG 含 "DAE" 时执行，不影响其他任何构建
 # =======================================================
@@ -897,7 +915,7 @@ if [[ "$WRT_CONFIG" == *"DAE"* ]]; then
         echo "[dae] 警告：clone luci-app-dae 失败，跳过（构建将失败）"
     fi
 
-    # 1. 拉取 Honk 完整 feed，保留 locks/ 和 .cache/ 供 package/honk 使用
+    # 1. 拉取 Honk 完整 feed，保留仓库根目录供 SDK 工具链配置使用
     #    Honk 是 dae 的 eBPF 透明代理替代方案，只有 DAE 固件启用。
     HONK_FEED_DIR="package/openwrt-honk"
     rm -rf "$HONK_FEED_DIR"
@@ -912,10 +930,11 @@ if [[ "$WRT_CONFIG" == *"DAE"* ]]; then
         exit 1
     fi
 
-    # Honk 的 Makefile 从仓库相邻目录读取锁定的 GeoIP/GeoSite 资源。
-    # 从 geo.lock.json 解析 URL 和 SHA256，避免 diy.sh 与插件仓库重复维护版本。
-    mapfile -t HONK_GEO_ASSETS < <(
-        python3 - "$HONK_FEED_DIR/locks/geo.lock.json" <<'PYEOF'
+    # 旧版 Honk 通过 geo.lock.json 自己下载 Geo 资源；新版改为依赖
+    # OpenWrt 的 v2ray-geoip/v2ray-geosite 包，不再携带 geo.lock.json。
+    if [ -f "$HONK_FEED_DIR/locks/geo.lock.json" ]; then
+        mapfile -t HONK_GEO_ASSETS < <(
+            python3 - "$HONK_FEED_DIR/locks/geo.lock.json" <<'PYEOF'
 import json
 import sys
 
@@ -925,29 +944,56 @@ with open(sys.argv[1], encoding="utf-8") as source:
 for asset in lock.get("assets", []):
     print("\t".join((asset["cachePath"], asset["sourceUrl"], asset["sha256"])))
 PYEOF
-    )
+        )
 
-    if [ "${#HONK_GEO_ASSETS[@]}" -eq 0 ]; then
-        echo "[honk] 错误：geo.lock.json 未包含任何 Geo 资源"
+        if [ "${#HONK_GEO_ASSETS[@]}" -eq 0 ]; then
+            echo "[honk] 错误：geo.lock.json 未包含任何 Geo 资源"
+            exit 1
+        fi
+
+        for HONK_GEO_ASSET in "${HONK_GEO_ASSETS[@]}"; do
+            IFS=$'\t' read -r HONK_GEO_PATH HONK_GEO_URL HONK_GEO_SHA256 <<< "$HONK_GEO_ASSET"
+            HONK_GEO_FILE="$HONK_FEED_DIR/$HONK_GEO_PATH"
+            mkdir -p "$(dirname "$HONK_GEO_FILE")"
+
+            echo "[honk] 下载并校验 $(basename "$HONK_GEO_FILE")"
+            if ! curl --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
+                --output "$HONK_GEO_FILE" "$HONK_GEO_URL"; then
+                echo "[honk] 错误：下载 Geo 资源失败 $HONK_GEO_URL"
+                exit 1
+            fi
+            if ! printf '%s  %s\n' "$HONK_GEO_SHA256" "$HONK_GEO_FILE" | sha256sum -c -; then
+                echo "[honk] 错误：Geo 资源校验失败 $HONK_GEO_FILE"
+                exit 1
+            fi
+        done
+    elif [ -f "$HONK_FEED_DIR/honk/Makefile" ] && \
+         grep -qE 'v2ray-geoip|v2ray-geosite' "$HONK_FEED_DIR/honk/Makefile"; then
+        echo "[honk] 当前版本使用 OpenWrt 的 v2ray-geoip/v2ray-geosite，无需下载旧版 Geo 锁定资源"
+    else
+        echo "[honk] 错误：未找到 geo.lock.json 或新版 Geo feed 依赖"
         exit 1
     fi
 
-    for HONK_GEO_ASSET in "${HONK_GEO_ASSETS[@]}"; do
-        IFS=$'\t' read -r HONK_GEO_PATH HONK_GEO_URL HONK_GEO_SHA256 <<< "$HONK_GEO_ASSET"
-        HONK_GEO_FILE="$HONK_FEED_DIR/$HONK_GEO_PATH"
-        mkdir -p "$(dirname "$HONK_GEO_FILE")"
-
-        echo "[honk] 下载并校验 $(basename "$HONK_GEO_FILE")"
-        if ! curl --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
-            --output "$HONK_GEO_FILE" "$HONK_GEO_URL"; then
-            echo "[honk] 错误：下载 Geo 资源失败 $HONK_GEO_URL"
-            exit 1
-        fi
-        if ! printf '%s  %s\n' "$HONK_GEO_SHA256" "$HONK_GEO_FILE" | sha256sum -c -; then
-            echo "[honk] 错误：Geo 资源校验失败 $HONK_GEO_FILE"
-            exit 1
-        fi
-    done
+    # 按 Honk 官方 feed 方式安装包，保留完整 clone 供 WRT-CORE 读取
+    # BPF Rust/toolchain 锁定信息。
+    HONK_FEEDS_CONF=""
+    if [ -f feeds.conf ]; then
+        HONK_FEEDS_CONF="feeds.conf"
+    elif [ -f feeds.conf.default ]; then
+        HONK_FEEDS_CONF="feeds.conf.default"
+    fi
+    if [ -z "$HONK_FEEDS_CONF" ]; then
+        echo "[honk] 错误：找不到 OpenWrt feeds 配置文件"
+        exit 1
+    fi
+    sed -i -E '/^[[:space:]]*src-[^[:space:]]+[[:space:]]+honk([[:space:]]|$)/d' "$HONK_FEEDS_CONF"
+    printf 'src-link honk %s\n' "$HONK_FEED_DIR" >> "$HONK_FEEDS_CONF"
+    if ! ./scripts/feeds update honk || \
+       ! ./scripts/feeds install -f -p honk honk luci-app-honk; then
+        echo "[honk] 错误：注册或安装 Honk feed 失败"
+        exit 1
+    fi
 
     # Honk 新版 LuCI 页面依赖 honk 引擎；legacy 页面保留在仓库中但不打入固件。
     for HONK_PACKAGE in honk luci-app-honk; do
