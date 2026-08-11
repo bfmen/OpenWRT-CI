@@ -876,8 +876,9 @@ echo "[kernel-fix] 完成。"
 # macaddr_lan 标签，但 ipq6000-gl-ax1800.dts 仍引用它们，导致 DTC
 # 在所有包含 GL-AX1800 镜像的 QCA 构建中直接失败。
 # =======================================================
-QCA_AX1800_DTS="target/linux/qualcommax/dts/ipq6000-gl-ax1800.dts"
-if [ -f "$QCA_AX1800_DTS" ] && \
+QCA_AX1800_DTS=$(find target/linux/qualcommax -type f \
+    -name 'ipq6000-gl-ax1800.dts' -print -quit 2>/dev/null)
+if [ -n "$QCA_AX1800_DTS" ] && \
    grep -qE 'nvmem-cells = <&macaddr_(wan|lan)>;' "$QCA_AX1800_DTS" && \
    ! grep -RqsE '^[[:space:]]*macaddr_(wan|lan):' \
        target/linux/qualcommax/dts target/linux/qualcommax/files 2>/dev/null; then
@@ -928,6 +929,17 @@ if [[ "$WRT_CONFIG" == *"DAE"* ]]; then
         https://github.com/breeze303/openwrt-honk.git "$HONK_FEED_DIR"; then
         echo "[honk] 错误：clone openwrt-honk 失败"
         exit 1
+    fi
+
+    # OpenWrt 的 /var 通常是指向 /tmp 的运行时链接，不能在包 staging
+    # 阶段把它当普通目录合并。Honk 初始化脚本会在首次启动时创建
+    # /var/share/honk，因此这里只移除 Makefile 的预创建动作。
+    HONK_MAKEFILE="$HONK_FEED_DIR/honk/Makefile"
+    if [ -f "$HONK_MAKEFILE" ] && \
+       grep -q '\$(1)/var/share/honk' "$HONK_MAKEFILE"; then
+        sed -i -E '/^[[:space:]]*chmod 0700 \$\(1\)\/var\/share\/honk[[:space:]]*$/d' "$HONK_MAKEFILE"
+        sed -i -E 's/[[:space:]]+\$\(1\)\/var\/share\/honk//g' "$HONK_MAKEFILE"
+        echo "[honk] 已移除 /var/share/honk 的 staging 预创建，改由 init 脚本运行时创建"
     fi
 
     # 旧版 Honk 通过 geo.lock.json 自己下载 Geo 资源；新版改为依赖
