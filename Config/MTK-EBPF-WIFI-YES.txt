@@ -1,7 +1,7 @@
 #设备平台
 CONFIG_TARGET_mediatek=y
 CONFIG_TARGET_mediatek_filogic=y
-#设备列表（与 MEDIATEK-WIFI-YES 相同；diy.sh 第 0 节白名单会过滤到 sx_7981r128 / nokia_ea0326gmp / cmcc_rax3000m 三台主力 MT7981B）
+#设备列表（与 MEDIATEK-WIFI-YES 相同；diy.sh 白名单会过滤到 sx_7981r128 / nokia_ea0326gmp / cmcc_rax3000m 三台主力 MT7981B）
 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_abt_asr3000=y
 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_asus_tuf-ax4200=y
 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_asus_tuf-ax4200q=y
@@ -70,7 +70,7 @@ CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_zbtlink_zbt-z8106ax-s=y
 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_zbtlink_zbt-z8106ax-t=y
 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_zbtlink_zbt-z8803be=y
 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_zyxel_ex5700-telenor=y
-#eBPF / dae 所需内核选项
+#eBPF 所需内核选项
 CONFIG_DEVEL=y
 CONFIG_KERNEL_DEBUG_INFO=y
 # CONFIG_KERNEL_DEBUG_INFO_REDUCED is not set
@@ -85,7 +85,7 @@ CONFIG_KERNEL_TRANSPARENT_HUGEPAGE=y
 CONFIG_KERNEL_TRANSPARENT_HUGEPAGE_MADVISE=y
 # CONFIG_KERNEL_TRANSPARENT_HUGEPAGE_NEVER is not set
 #（MTK 平台不加 CONFIG_KERNEL_SKB_RECYCLER，那是 QCA 专属）
-#dae 相关包
+# eBPF 固件由 diy.sh 仅启用 Honk
 CONFIG_PACKAGE_dae=y
 CONFIG_PACKAGE_luci-app-dae=y
 CONFIG_PACKAGE_kmod-sched-core=y

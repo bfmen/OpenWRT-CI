@@ -77,7 +77,7 @@ jobs:
           sudo -E apt -yqq autoclean
           sudo -E apt -yqq clean
           sudo -E apt -yqq install dos2unix libfuse-dev libxml2
-          if [[ "${WRT_CONFIG}" == *"DAE"* ]]; then
+          if [[ "${WRT_CONFIG}" == *"EBPF"* ]]; then
             sudo -E apt -yqq install clang llvm libbpf-dev libclang-dev pkg-config cmake zstd
           fi
           sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
@@ -179,7 +179,7 @@ jobs:
           $GITHUB_WORKSPACE/Scripts/Settings.sh
           $GITHUB_WORKSPACE/Scripts/diy.sh
 
-          if [[ "${WRT_CONFIG}" == *"DAE"* ]]; then
+          if [[ "${WRT_CONFIG}" == *"EBPF"* ]]; then
             HONK_BPF_RUST_TOOLCHAIN=$(sed -n 's/^BPF_RUST_TOOLCHAIN?=//p' package/openwrt-honk/honk/Makefile | head -n 1)
             HONK_BPF_LINKER_VERSION=$(sed -n 's/^readonly bpf_linker_version=.*:-\([^}]*\)}$/\1/p' package/openwrt-honk/.github/scripts/build-packages-in-sdk.sh | head -n 1)
             HONK_BPF_LINKER_SHA256=$(sed -n 's/^readonly bpf_linker_sha256=.*:-\([^}]*\)}$/\1/p' package/openwrt-honk/.github/scripts/build-packages-in-sdk.sh | head -n 1)

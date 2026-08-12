@@ -946,19 +946,19 @@ if [ -n "$QCA_AX1800_DTS" ] && \
 fi
 
 # =======================================================
-# [dae] DAE 构建专项处理
-# 仅当 WRT_CONFIG 含 "DAE" 时执行，不影响其他任何构建
+# [ebpf] eBPF 构建专项处理
+# 仅当 WRT_CONFIG 含 "EBPF" 时执行，不影响其他任何构建
 # =======================================================
-if [[ "$WRT_CONFIG" == *"DAE"* ]]; then
+if [[ "$WRT_CONFIG" == *"EBPF"* ]]; then
     echo "================================================================"
-    echo "[dae] 开始 DAE 构建专项配置..."
+    echo "[ebpf] 开始 eBPF 构建专项配置..."
 
-    MTK_DAE_HONK_ONLY=false
-    if [[ "$WRT_CONFIG" == "MTK-DAE-"* || "$WRT_CONFIG" == "MEDIATEK-DAE-"* ]]; then
-        MTK_DAE_HONK_ONLY=true
+    MTK_EBPF_HONK_ONLY=false
+    if [[ "$WRT_CONFIG" == "MTK-EBPF-"* || "$WRT_CONFIG" == "MEDIATEK-EBPF-"* ]]; then
+        MTK_EBPF_HONK_ONLY=true
     fi
 
-    if [[ "$MTK_DAE_HONK_ONLY" != true ]]; then
+    if [[ "$MTK_EBPF_HONK_ONLY" != true ]]; then
         # 0. 从独立仓库拉取 dae + luci-app-dae 包
         #    仓库：https://github.com/ysuolmai/luci-app-dae
         #    这两个包独立维护，便于版本升级和复用，不污染主仓库
@@ -984,11 +984,11 @@ if [[ "$WRT_CONFIG" == *"DAE"* ]]; then
             \( -name dae -o -name luci-app-dae -o -name luci-app-daed \) \
             -exec rm -rf {} + 2>/dev/null
         sed -i -E '/^(CONFIG_PACKAGE_(dae|luci-app-dae|luci-app-daed)=|# CONFIG_PACKAGE_(dae|luci-app-dae|luci-app-daed) is not set)/d' .config
-        echo "[dae] MTK-DAE 仅启用 Honk，已移除 dae / luci-app-dae / luci-app-daed"
+        echo "[ebpf] MTK-EBPF 仅启用 Honk，已移除 dae / luci-app-dae / luci-app-daed"
     fi
 
     # 1. 拉取 Honk 完整 feed，保留仓库根目录供 SDK 工具链配置使用
-    #    Honk 是 dae 的 eBPF 透明代理替代方案，只有 DAE 固件启用。
+    #    Honk 是 eBPF 透明代理引擎，只在 EBPF 固件启用。
     HONK_FEED_DIR="package/openwrt-honk"
     rm -rf "$HONK_FEED_DIR"
     find feeds/ package/ -maxdepth 5 \
@@ -1085,12 +1085,12 @@ PYEOF
     done
     echo "[honk] 已启用 honk + luci-app-honk"
 
-    # 2. 移除 openclash 和 passwall（dae/Honk 是唯一透明代理，避免冲突）
+    # 2. 移除 openclash 和 passwall（eBPF/Honk 是唯一透明代理，避免冲突）
     sed -i '/openclash/d; /passwall/d' .config
-    echo "[dae] 已从 .config 移除 openclash / passwall 相关行"
+    echo "[ebpf] 已从 .config 移除 openclash / passwall 相关行"
 
     # 3. 扩大 eMMC 设备内核分区
-    #    dae 包含 eBPF 字节码，编译产物比普通代理大，默认 6144k 不够
+    #    eBPF 包含字节码，编译产物比普通代理大，默认 6144k 不够
     image_file='./target/linux/qualcommax/image/ipq60xx.mk'
     if [ -f "$image_file" ]; then
         sed -i "/^define Device\/emmc-common/,/^endef/ s/KERNEL_SIZE := 6144k/KERNEL_SIZE := 12288k/" "$image_file"
@@ -1099,9 +1099,9 @@ PYEOF
         sed -i "/^define Device\/jdcloud_re-cs-07/,/^endef/ { /KERNEL_SIZE := 6144k/s//KERNEL_SIZE := 12288k/ }" "$image_file"
         sed -i "/^define Device\/link_nn6000-common/,/^endef/ { /KERNEL_SIZE := 6144k/s//KERNEL_SIZE := 12288k/ }" "$image_file"
         sed -i "/^define Device\/linksys_mr/,/^endef/ { /KERNEL_SIZE := 8192k/s//KERNEL_SIZE := 12288k/ }" "$image_file"
-        echo "[dae] eMMC 内核分区已扩大至 12288k"
+        echo "[ebpf] eMMC 内核分区已扩大至 12288k"
     fi
 
-    echo "[dae] DAE 构建专项配置完成"
+    echo "[ebpf] eBPF 构建专项配置完成"
     echo "================================================================"
 fi
