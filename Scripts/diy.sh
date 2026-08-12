@@ -405,6 +405,61 @@ sed -i "/^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_/{
     /$mtk_keep/! s/^CONFIG_\([^=]*\)=.*/# CONFIG_\1 is not set/
 }" ./.config
 
+# cmcc_rax3000m 只有 NAND 版本在本 CI 中需要编译。上游设备定义继承了
+# eMMC overlay、GPT、BL2 和 FIP artifact，但当前构建环境没有对应的
+# mt7981-emmc-ddr4-bl2.img；这里只针对该设备移除 eMMC 变体，保留 NAND。
+if [[ "$WRT_CONFIG" == "MEDIATEK-"* || "$WRT_CONFIG" == "MTK-"* ]]; then
+    MTK_FILOGIC_MK="target/linux/mediatek/image/filogic.mk"
+    if [ -f "$MTK_FILOGIC_MK" ]; then
+        awk '
+            /^define Device\/cmcc_rax3000m_common$/ {
+                block = "other"
+                print
+                next
+            }
+            /^define Device\/cmcc_rax3000m$/ {
+                block = "rax3000m"
+                print
+                next
+            }
+            /^define Device\/cmcc_rax3000me$/ {
+                block = "rax3000me"
+                print
+                next
+            }
+            /^define Device\// {
+                block = "other"
+            }
+            block == "rax3000m" && /\$\(call Device\/cmcc_rax3000m_common\)/ {
+                print
+                print "  DEVICE_DTS_OVERLAY := mt7981b-cmcc-rax3000m-nand"
+                print "  ARTIFACTS := nand-preloader.bin nand-bl31-uboot.fip"
+                next
+            }
+            block == "rax3000m" && /ARTIFACTS \+= emmc-preloader\.bin emmc-bl31-uboot\.fip/ {
+                skip_nand_line = 1
+                next
+            }
+            block == "rax3000m" && skip_nand_line && /nand-preloader\.bin nand-bl31-uboot\.fip/ {
+                skip_nand_line = 0
+                next
+            }
+            block == "rax3000m" && /ARTIFACT\/emmc-preloader\.bin := mt7981-bl2 emmc-ddr4/ {
+                next
+            }
+            block == "rax3000m" && /ARTIFACT\/emmc-bl31-uboot\.fip := mt7981-bl31-uboot cmcc_rax3000m-emmc/ {
+                next
+            }
+            /^endef$/ {
+                block = ""
+                skip_nand_line = 0
+            }
+            { print }
+        ' "$MTK_FILOGIC_MK" > "$MTK_FILOGIC_MK.new" && mv "$MTK_FILOGIC_MK.new" "$MTK_FILOGIC_MK"
+        echo "[mtk-fix] cmcc_rax3000m 已限制为 NAND 版本，保留 cmcc_rax3000me 的 eMMC 定义"
+    fi
+fi
+
 
 keywords_to_delete=(
     "uugamebooster" "luci-app-wol" "luci-i18n-wol-zh-cn" "CONFIG_TARGET_INITRAMFS" "ddns" "luci-app-advancedplus" "mihomo" "nikki"
@@ -898,23 +953,38 @@ if [[ "$WRT_CONFIG" == *"DAE"* ]]; then
     echo "================================================================"
     echo "[dae] 开始 DAE 构建专项配置..."
 
-    # 0. 从独立仓库拉取 dae + luci-app-dae 包
-    #    仓库：https://github.com/ysuolmai/luci-app-dae
-    #    这两个包独立维护，便于版本升级和复用，不污染主仓库
-    DAE_FEED_DIR="/tmp/luci-app-dae-feed"
-    rm -rf "$DAE_FEED_DIR"
-    if git clone --depth=1 https://github.com/ysuolmai/luci-app-dae "$DAE_FEED_DIR"; then
-        # 上游 ImmortalWrt 的 feeds 自带 dae / luci-app-dae / luci-app-daed，
-        # 与我们的同名会撞，buildroot 可能编了上游那份。像 UPDATE_PACKAGE 一样
-        # 把 feeds 和 package 里所有同名包先全删干净，再放我们的。
-        find feeds/ package/ -maxdepth 4 -type d \
+    MTK_DAE_HONK_ONLY=false
+    if [[ "$WRT_CONFIG" == "MTK-DAE-"* || "$WRT_CONFIG" == "MEDIATEK-DAE-"* ]]; then
+        MTK_DAE_HONK_ONLY=true
+    fi
+
+    if [[ "$MTK_DAE_HONK_ONLY" != true ]]; then
+        # 0. 从独立仓库拉取 dae + luci-app-dae 包
+        #    仓库：https://github.com/ysuolmai/luci-app-dae
+        #    这两个包独立维护，便于版本升级和复用，不污染主仓库
+        DAE_FEED_DIR="/tmp/luci-app-dae-feed"
+        rm -rf "$DAE_FEED_DIR"
+        if git clone --depth=1 https://github.com/ysuolmai/luci-app-dae "$DAE_FEED_DIR"; then
+            # 上游 ImmortalWrt 的 feeds 自带 dae / luci-app-dae / luci-app-daed，
+            # 与我们的同名会撞，buildroot 可能编了上游那份。像 UPDATE_PACKAGE 一样
+            # 把 feeds 和 package 里所有同名包先全删干净，再放我们的。
+            find feeds/ package/ -maxdepth 4 -type d \
+                \( -name dae -o -name luci-app-dae -o -name luci-app-daed \) \
+                -exec rm -rf {} + 2>/dev/null
+            cp -rf "$DAE_FEED_DIR/dae"          package/
+            cp -rf "$DAE_FEED_DIR/luci-app-dae" package/
+            echo "[dae] 已从 ysuolmai/luci-app-dae 拉取 dae + luci-app-dae"
+        else
+            echo "[dae] 警告：clone luci-app-dae 失败，跳过（构建将失败）"
+        fi
+    else
+        rm -rf /tmp/luci-app-dae-feed
+        find feeds/ package/ -maxdepth 4 \
+            \( -type d -o -type l \) \
             \( -name dae -o -name luci-app-dae -o -name luci-app-daed \) \
             -exec rm -rf {} + 2>/dev/null
-        cp -rf "$DAE_FEED_DIR/dae"          package/
-        cp -rf "$DAE_FEED_DIR/luci-app-dae" package/
-        echo "[dae] 已从 ysuolmai/luci-app-dae 拉取 dae + luci-app-dae"
-    else
-        echo "[dae] 警告：clone luci-app-dae 失败，跳过（构建将失败）"
+        sed -i -E '/^(CONFIG_PACKAGE_(dae|luci-app-dae|luci-app-daed)=|# CONFIG_PACKAGE_(dae|luci-app-dae|luci-app-daed) is not set)/d' .config
+        echo "[dae] MTK-DAE 仅启用 Honk，已移除 dae / luci-app-dae / luci-app-daed"
     fi
 
     # 1. 拉取 Honk 完整 feed，保留仓库根目录供 SDK 工具链配置使用
