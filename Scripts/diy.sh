@@ -399,11 +399,62 @@ sed -i "/^CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_/{
 # 里的设备一律显式设为 not set，避免 make defconfig 恢复默认设备。
 # 想多编几个设备就往 mtk_keep 里加（用 \| 分隔），名字对应
 # Config/MEDIATEK-WIFI-*.txt 里 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_xxx 的 xxx。
-mtk_keep="\(sx_7981r128\|nokia_ea0326gmp\)=y$"
+mtk_keep="\(sx_7981r128\|nokia_ea0326gmp\|cmcc_rax3000m\)=y$"
 
 sed -i "/^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_/{
     /$mtk_keep/! s/^CONFIG_\([^=]*\)=.*/# CONFIG_\1 is not set/
 }" ./.config
+
+# cmcc_rax3000m 只编译 NAND 版本。上游公共定义同时带入 eMMC overlay、GPT
+# 和 eMMC/NAND 两套 artifact；这里在源码进入 image 规则前重写该设备定义，
+# 避免没有 eMMC BL2 时仍生成 eMMC 文件。
+if [[ "$WRT_CONFIG" == "MEDIATEK-"* || "$WRT_CONFIG" == "MTK-"* ]]; then
+    MTK_FILOGIC_MK="target/linux/mediatek/image/filogic.mk"
+    if [ -f "$MTK_FILOGIC_MK" ]; then
+        awk '
+            /^define Device\/cmcc_rax3000m$/ {
+                in_rax3000m = 1
+                skip_rax3000m = 0
+                print
+                next
+            }
+            /^define Device\/cmcc_rax3000me$/ {
+                in_rax3000m = 0
+                skip_rax3000m = 0
+                print
+                next
+            }
+            in_rax3000m && /\$\(call Device\/cmcc_rax3000m_common\)/ {
+                print
+                print "  DEVICE_DTS_OVERLAY := mt7981b-cmcc-rax3000m-nand"
+                print "  ARTIFACTS := nand-preloader.bin nand-bl31-uboot.fip"
+                print "  ARTIFACT/nand-preloader.bin := mt7981-bl2 spim-nand-ddr4"
+                print "  ARTIFACT/nand-bl31-uboot.fip := mt7981-bl31-uboot cmcc_rax3000m-nand"
+                skip_rax3000m = 1
+                next
+            }
+            in_rax3000m && /^endef$/ {
+                in_rax3000m = 0
+                skip_rax3000m = 0
+                print
+                next
+            }
+            in_rax3000m && skip_rax3000m { next }
+            { print }
+        ' "$MTK_FILOGIC_MK" > "$MTK_FILOGIC_MK.new" && mv "$MTK_FILOGIC_MK.new" "$MTK_FILOGIC_MK"
+        echo "[mtk-fix] cmcc_rax3000m 已限制为 NAND artifact"
+    fi
+
+    # U-Boot/TFA 的默认条件会按设备名同时启用 cmcc_rax3000m 的 eMMC/NAND
+    # 变体；显式注释 eMMC，保留 NAND 引导链。
+    sed -i -E '/^(CONFIG_PACKAGE_(u-boot-mt7981_cmcc_rax3000m-(emmc|nand)|trusted-firmware-a-mt7981-(emmc-ddr4|spim-nand-ddr4))=|# CONFIG_PACKAGE_(u-boot-mt7981_cmcc_rax3000m-(emmc|nand)|trusted-firmware-a-mt7981-(emmc-ddr4|spim-nand-ddr4)) is not set)/d' .config
+    cat >> .config <<'EOF'
+CONFIG_PACKAGE_u-boot-mt7981_cmcc_rax3000m-nand=y
+# CONFIG_PACKAGE_u-boot-mt7981_cmcc_rax3000m-emmc is not set
+CONFIG_PACKAGE_trusted-firmware-a-mt7981-spim-nand-ddr4=y
+# CONFIG_PACKAGE_trusted-firmware-a-mt7981-emmc-ddr4 is not set
+EOF
+fi
 
 keywords_to_delete=(
     "uugamebooster" "luci-app-wol" "luci-i18n-wol-zh-cn" "CONFIG_TARGET_INITRAMFS" "ddns" "luci-app-advancedplus" "mihomo" "nikki"
