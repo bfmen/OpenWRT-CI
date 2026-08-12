@@ -399,67 +399,11 @@ sed -i "/^CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_/{
 # 里的设备一律显式设为 not set，避免 make defconfig 恢复默认设备。
 # 想多编几个设备就往 mtk_keep 里加（用 \| 分隔），名字对应
 # Config/MEDIATEK-WIFI-*.txt 里 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_xxx 的 xxx。
-mtk_keep="\(sx_7981r128\|nokia_ea0326gmp\|cmcc_rax3000m\)=y$"
+mtk_keep="\(sx_7981r128\|nokia_ea0326gmp\)=y$"
 
 sed -i "/^CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_/{
     /$mtk_keep/! s/^CONFIG_\([^=]*\)=.*/# CONFIG_\1 is not set/
 }" ./.config
-
-# cmcc_rax3000m 只有 NAND 版本在本 CI 中需要编译。上游设备定义继承了
-# eMMC overlay、GPT、BL2 和 FIP artifact，但当前构建环境没有对应的
-# mt7981-emmc-ddr4-bl2.img；这里只针对该设备移除 eMMC 变体，保留 NAND。
-if [[ "$WRT_CONFIG" == "MEDIATEK-"* || "$WRT_CONFIG" == "MTK-"* ]]; then
-    MTK_FILOGIC_MK="target/linux/mediatek/image/filogic.mk"
-    if [ -f "$MTK_FILOGIC_MK" ]; then
-        awk '
-            /^define Device\/cmcc_rax3000m_common$/ {
-                block = "other"
-                print
-                next
-            }
-            /^define Device\/cmcc_rax3000m$/ {
-                block = "rax3000m"
-                print
-                next
-            }
-            /^define Device\/cmcc_rax3000me$/ {
-                block = "rax3000me"
-                print
-                next
-            }
-            /^define Device\// {
-                block = "other"
-            }
-            block == "rax3000m" && /\$\(call Device\/cmcc_rax3000m_common\)/ {
-                print
-                print "  DEVICE_DTS_OVERLAY := mt7981b-cmcc-rax3000m-nand"
-                print "  ARTIFACTS := nand-preloader.bin nand-bl31-uboot.fip"
-                next
-            }
-            block == "rax3000m" && /ARTIFACTS \+= emmc-preloader\.bin emmc-bl31-uboot\.fip/ {
-                skip_nand_line = 1
-                next
-            }
-            block == "rax3000m" && skip_nand_line && /nand-preloader\.bin nand-bl31-uboot\.fip/ {
-                skip_nand_line = 0
-                next
-            }
-            block == "rax3000m" && /ARTIFACT\/emmc-preloader\.bin := mt7981-bl2 emmc-ddr4/ {
-                next
-            }
-            block == "rax3000m" && /ARTIFACT\/emmc-bl31-uboot\.fip := mt7981-bl31-uboot cmcc_rax3000m-emmc/ {
-                next
-            }
-            /^endef$/ {
-                block = ""
-                skip_nand_line = 0
-            }
-            { print }
-        ' "$MTK_FILOGIC_MK" > "$MTK_FILOGIC_MK.new" && mv "$MTK_FILOGIC_MK.new" "$MTK_FILOGIC_MK"
-        echo "[mtk-fix] cmcc_rax3000m 已限制为 NAND 版本，保留 cmcc_rax3000me 的 eMMC 定义"
-    fi
-fi
-
 
 keywords_to_delete=(
     "uugamebooster" "luci-app-wol" "luci-i18n-wol-zh-cn" "CONFIG_TARGET_INITRAMFS" "ddns" "luci-app-advancedplus" "mihomo" "nikki"
@@ -1006,10 +950,21 @@ if [[ "$WRT_CONFIG" == *"EBPF"* ]]; then
     # 阶段把它当普通目录合并。Honk 初始化脚本会在首次启动时创建
     # /var/share/honk，因此这里只移除 Makefile 的预创建动作。
     HONK_MAKEFILE="$HONK_FEED_DIR/honk/Makefile"
-    if [ -f "$HONK_MAKEFILE" ] && \
-       grep -q '\$(1)/var/share/honk' "$HONK_MAKEFILE"; then
-        sed -i -E '/^[[:space:]]*chmod 0700 \$\(1\)\/var\/share\/honk[[:space:]]*$/d' "$HONK_MAKEFILE"
-        sed -i -E 's/[[:space:]]+\$\(1\)\/var\/share\/honk//g' "$HONK_MAKEFILE"
+    if [ -f "$HONK_MAKEFILE" ]; then
+        # /var 是 OpenWrt staging 中的运行时链接，不能由包安装成目录。
+        # 同时处理 INSTALL_DIR 与单独的 chmod 行，兼容上游换行或排版变化。
+        awk '
+            /^[[:space:]]*chmod[[:space:]]+0700[[:space:]]+\$\(1\)\/var\/share\/honk[[:space:]]*$/ { next }
+            {
+                gsub(/[[:space:]]+\$\(1\)\/var\/share\/honk/, "")
+                print
+            }
+        ' "$HONK_MAKEFILE" > "$HONK_MAKEFILE.new" && mv "$HONK_MAKEFILE.new" "$HONK_MAKEFILE"
+
+        if grep -qF '$(1)/var/share/honk' "$HONK_MAKEFILE"; then
+            echo "[honk] 错误：Makefile 仍会在 staging 阶段创建 /var/share/honk"
+            exit 1
+        fi
         echo "[honk] 已移除 /var/share/honk 的 staging 预创建，改由 init 脚本运行时创建"
     fi
 
