@@ -590,13 +590,6 @@ fi
 	#"CONFIG_PACKAGE_luci-i18n-nikki-zh-cn=y"
 	#"CONFIG_PACKAGE_luci-app-lucky=y"
 	#"CONFIG_PACKAGE_lucky=y"
-	# =========================
-    # [Travel Router]
-    # 经常出差使用，酒店/机场 WiFi
-    # =========================
-    "CONFIG_PACKAGE_travelmate=y"
-    "CONFIG_PACKAGE_luci-app-travelmate=y"
-
     # =========================
     # [Travel Router Tools]
     # =========================
@@ -626,6 +619,14 @@ fi
 
     "CONFIG_PACKAGE_lsblk=y"
 )
+
+if [[ "$WRT_CONFIG" == *"WIFI-YES"* ]]; then
+    provided_config_lines+=(
+        # TravelMate 只用于带 WiFi 的固件，WIFI-NO 固件不加入这两个包。
+        "CONFIG_PACKAGE_travelmate=y"
+        "CONFIG_PACKAGE_luci-app-travelmate=y"
+    )
+fi
 
 [[ $WRT_CONFIG == "IPQ"* ]] && provided_config_lines+=(
     "CONFIG_PACKAGE_sqm-scripts-nss=y"
