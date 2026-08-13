@@ -1,6 +1,45 @@
 #!/bin/bash
 
 # =======================================================
+# [section: config-helpers] 统一维护 OpenWrt .config
+# =======================================================
+# value 支持 y/m/n、带引号的值、unset（显式 not set）和 remove（删除配置行）。
+set_config() {
+    local config_name="$1"
+    local config_value="$2"
+    local config_key="CONFIG_${config_name}"
+
+    if ! awk -v key="$config_key" '
+        index($0, key "=") == 1 || $0 == "# " key " is not set" { next }
+        { print }
+    ' .config > .config.new; then
+        echo "[config] 错误：无法更新 .config 中的 $config_key"
+        return 1
+    fi
+    if ! mv .config.new .config; then
+        echo "[config] 错误：无法替换 .config"
+        return 1
+    fi
+
+    case "$config_value" in
+        remove)
+            ;;
+        unset)
+            if ! printf '# %s is not set\n' "$config_key" >> .config; then
+                echo "[config] 错误：无法写入 $config_key"
+                return 1
+            fi
+            ;;
+        *)
+            if ! printf '%s=%s\n' "$config_key" "$config_value" >> .config; then
+                echo "[config] 错误：无法写入 $config_key"
+                return 1
+            fi
+            ;;
+    esac
+}
+
+# =======================================================
 # [upstream-fix] 删除上游 immortalwrt 格式损坏的 globitel-bt-r320 patch
 # 该 patch (immortalwrt commit a3105d3f, 2026-05-07) 在 line 162/218 处
 # 相邻多个 `--- /dev/null` 块之间缺 `diff --git` file-boundary header，
@@ -31,7 +70,8 @@ SX7981_FILOGIC_MK="target/linux/mediatek/image/filogic.mk"
 SX7981_UBOOT_ENVTOOLS="package/boot/uboot-tools/uboot-envtools/files/mediatek_filogic"
 SX7981_SMP_SH="package/mtk/applications/mtk-smp/files/smp.sh"
 
-if [ -f "$SX7981_DTS_SRC" ] && [ -d "target/linux/mediatek/dts" ]; then
+if [[ "$WRT_CONFIG" == "MEDIATEK-"* || "$WRT_CONFIG" == "MTK-"* ]] && \
+   [ -f "$SX7981_DTS_SRC" ] && [ -d "target/linux/mediatek/dts" ]; then
     echo "================================================================"
     echo "[device-add] 注入 SX 7981R128 设备支持..."
 
@@ -237,7 +277,9 @@ UCI_EOF
     echo "================================================================"
 fi
 
-#安装和更新软件包
+# =======================================================
+# [section: package-sources] 安装和更新软件包
+# =======================================================
 UPDATE_PACKAGE() {
 	local PKG_NAME=$1
 	local PKG_REPO=$2
@@ -258,7 +300,7 @@ UPDATE_PACKAGE() {
 	
 	if ! git clone --depth=1 --single-branch --branch "$PKG_BRANCH" "$PKG_REPO" "package/$REPO_NAME"; then
 		echo "错误: 克隆仓库失败 $PKG_REPO"
-		return 1
+		exit 1
 	fi
 	
 	case "$PKG_SPECIAL" in
@@ -340,9 +382,12 @@ find feeds/luci feeds/packages package -maxdepth 5 \
        -o -name dockerd -o -name luci-app-dockerman \) \
     -prune -exec rm -rf {} + 2>/dev/null
 rm -rf package/ysuolmai-packages
-git clone --depth=1 --single-branch --branch main \
+if ! git clone --depth=1 --single-branch --branch main \
     https://github.com/ysuolmai/openwrt-packages.git \
-    package/ysuolmai-packages
+    package/ysuolmai-packages; then
+    echo "[diy] 错误：克隆自维护软件包仓库失败"
+    exit 1
+fi
 echo "[diy] self-maintained package collection installed"
 
 #speedtest
@@ -357,9 +402,9 @@ sed -i 's|$(INSTALL_BIN) $(PKG_BUILD_DIR)/quickfile-$(ARCH_PACKAGES) $(1)/usr/bi
 UPDATE_PACKAGE "openwrt-bandix" "timsaya/openwrt-bandix" "main"
 UPDATE_PACKAGE "luci-app-bandix" "timsaya/luci-app-bandix" "main"
 
-#######################################
-#DIY Settings
-#######################################
+# =======================================================
+# [section: image-and-config] 固件标识和基础配置
+# =======================================================
 WRT_IP="192.168.1.1"
 WRT_NAME="FWRT"
 WRT_WIFI="FWRT"
@@ -447,15 +492,15 @@ if [[ "$WRT_CONFIG" == "MEDIATEK-"* || "$WRT_CONFIG" == "MTK-"* ]]; then
 
     # U-Boot/TFA 的默认条件会按设备名同时启用 cmcc_rax3000m 的 eMMC/NAND
     # 变体；显式注释 eMMC，保留 NAND 引导链。
-    sed -i -E '/^(CONFIG_PACKAGE_(u-boot-mt7981_cmcc_rax3000m-(emmc|nand)|trusted-firmware-a-mt7981-(emmc-ddr4|spim-nand-ddr4))=|# CONFIG_PACKAGE_(u-boot-mt7981_cmcc_rax3000m-(emmc|nand)|trusted-firmware-a-mt7981-(emmc-ddr4|spim-nand-ddr4)) is not set)/d' .config
-    cat >> .config <<'EOF'
-CONFIG_PACKAGE_u-boot-mt7981_cmcc_rax3000m-nand=y
-# CONFIG_PACKAGE_u-boot-mt7981_cmcc_rax3000m-emmc is not set
-CONFIG_PACKAGE_trusted-firmware-a-mt7981-spim-nand-ddr4=y
-# CONFIG_PACKAGE_trusted-firmware-a-mt7981-emmc-ddr4 is not set
-EOF
+    set_config "PACKAGE_u-boot-mt7981_cmcc_rax3000m-nand" y || exit 1
+    set_config "PACKAGE_u-boot-mt7981_cmcc_rax3000m-emmc" unset || exit 1
+    set_config "PACKAGE_trusted-firmware-a-mt7981-spim-nand-ddr4" y || exit 1
+    set_config "PACKAGE_trusted-firmware-a-mt7981-emmc-ddr4" unset || exit 1
 fi
 
+# =======================================================
+# [section: target-policy] 按构建类型筛选目标设备和功能
+# =======================================================
 keywords_to_delete=(
     "uugamebooster" "luci-app-wol" "luci-i18n-wol-zh-cn" "CONFIG_TARGET_INITRAMFS" "ddns" "luci-app-advancedplus" "mihomo" "nikki"
     "smartdns" "luci-app-partexp" "luci-app-upnp" "diskmanager"
@@ -490,6 +535,9 @@ if [[ "$WRT_CONFIG" == *"WIFI-NO"* ]]; then
     fi
 fi
 
+# =======================================================
+# [section: package-config] 按构建类型整理软件包配置
+# =======================================================
 provided_config_lines=(
     "CONFIG_PACKAGE_luci-app-zerotier=y"
     "CONFIG_PACKAGE_luci-i18n-zerotier-zh-cn=y"
@@ -638,7 +686,10 @@ fi
 )
 
 for line in "${provided_config_lines[@]}"; do
-    echo "$line" >> .config
+    config_line="${line#CONFIG_}"
+    config_name="${config_line%%=*}"
+    config_value="${config_line#*=}"
+    set_config "$config_name" "$config_value" || exit 1
 done
 
 # =======================================================
@@ -661,8 +712,7 @@ else
     echo "[pkg-fix] 没有文件依赖 kmod-iptables (已是干净状态)"
 fi
 
-sed -i '/^CONFIG_PACKAGE_kmod-iptables=/d' .config
-echo '# CONFIG_PACKAGE_kmod-iptables is not set' >> .config
+set_config "PACKAGE_kmod-iptables" unset || exit 1
 echo "================================================================"
 
 # =======================================================
@@ -688,8 +738,7 @@ else
     echo "[pkg-fix-2] 没有文件依赖 +iptables (已是干净状态)"
 fi
 
-sed -i '/^CONFIG_PACKAGE_iptables=/d' .config
-echo '# CONFIG_PACKAGE_iptables is not set' >> .config
+set_config "PACKAGE_iptables" unset || exit 1
 echo "================================================================"
 
 # =======================================================
@@ -751,6 +800,9 @@ fi
 echo "================================================================"
 
 
+# =======================================================
+# [section: filesystem-customization] 固件文件和主题定制
+# =======================================================
 find ./ -name "cascade.css" -exec sed -i 's/#5e72e4/#31A1A1/g; s/#483d8b/#31A1A1/g' {} \;
 find ./ -name "dark.css" -exec sed -i 's/#5e72e4/#31A1A1/g; s/#483d8b/#31A1A1/g' {} \;
 find ./ -name "cascade.less" -exec sed -i 's/#5e72e4/#31A1A1/g; s/#483d8b/#31A1A1/g' {} \;
@@ -799,7 +851,7 @@ fi
 
 
 # =======================================================
-# 使用自维护的原生 nftables Dockerman，并补齐 luci-lib-docker
+# [section: docker] 使用自维护的原生 nftables Dockerman，并补齐 luci-lib-docker
 # =======================================================
 echo "Handling Docker dependencies..."
 
@@ -814,11 +866,20 @@ if [ ! -f package/ysuolmai-packages/luci-app-dockerman/Makefile ]; then
 fi
 
 echo "Cloning luci-lib-docker..."
-git clone --depth 1 https://github.com/lisaac/luci-lib-docker.git temp_libdocker
+if ! git clone --depth 1 https://github.com/lisaac/luci-lib-docker.git temp_libdocker; then
+    echo "错误：克隆 luci-lib-docker 失败"
+    exit 1
+fi
 if [ -d "temp_libdocker/collections/luci-lib-docker" ]; then
-    mv temp_libdocker/collections/luci-lib-docker package/luci-lib-docker
+    if ! mv temp_libdocker/collections/luci-lib-docker package/luci-lib-docker; then
+        echo "错误：安装 luci-lib-docker 失败"
+        exit 1
+    fi
 else
-    mv temp_libdocker package/luci-lib-docker
+    if ! mv temp_libdocker package/luci-lib-docker; then
+        echo "错误：安装 luci-lib-docker 失败"
+        exit 1
+    fi
 fi
 rm -rf temp_libdocker
 
@@ -879,14 +940,26 @@ if ! grep -q "CMAKE_POLICY_VERSION_MINIMUM" include/cmake.mk; then
     echo 'CMAKE_OPTIONS += -DCMAKE_POLICY_VERSION_MINIMUM=3.5' >> include/cmake.mk
 fi
 
+# =======================================================
+# [section: toolchain-refresh] 升级 Go 工具链
+# =======================================================
 # 升级 golang 到支持 go.mod >= 1.26 的版本
 WRT_DIR=$(pwd)
 GO_TMP_DIR=/tmp/openwrt-packages
 rm -rf feeds/packages/lang/golang
 rm -rf "$GO_TMP_DIR"
-git clone https://github.com/openwrt/packages --depth=1 --filter=blob:none --sparse "$GO_TMP_DIR"
-cd "$GO_TMP_DIR" && git sparse-checkout set lang/golang
-cp -r "$GO_TMP_DIR/lang/golang" "$WRT_DIR/feeds/packages/lang/golang"
+if ! git clone https://github.com/openwrt/packages --depth=1 --filter=blob:none --sparse "$GO_TMP_DIR"; then
+    echo "错误：克隆 OpenWrt packages 仓库失败"
+    exit 1
+fi
+if ! (cd "$GO_TMP_DIR" && git sparse-checkout set lang/golang); then
+    echo "错误：配置 Go sparse-checkout 失败"
+    exit 1
+fi
+if ! cp -r "$GO_TMP_DIR/lang/golang" "$WRT_DIR/feeds/packages/lang/golang"; then
+    echo "错误：安装 Go feed 失败"
+    exit 1
+fi
 cd "$WRT_DIR"
 GO_DEFAULT_VERSION=$(sed -n 's/^GO_DEFAULT_VERSION:=//p' feeds/packages/lang/golang/golang-values.mk | head -n 1)
 rm -rf package/feeds/packages/golang*
@@ -960,26 +1033,31 @@ if [[ "$WRT_CONFIG" == *"EBPF"* ]]; then
         #    这两个包独立维护，便于版本升级和复用，不污染主仓库
         DAE_FEED_DIR="/tmp/luci-app-dae-feed"
         rm -rf "$DAE_FEED_DIR"
-        if git clone --depth=1 https://github.com/ysuolmai/luci-app-dae "$DAE_FEED_DIR"; then
-            # 上游 ImmortalWrt 的 feeds 自带 dae / luci-app-dae / luci-app-daed，
-            # 与我们的同名会撞，buildroot 可能编了上游那份。像 UPDATE_PACKAGE 一样
-            # 把 feeds 和 package 里所有同名包先全删干净，再放我们的。
-            find feeds/ package/ -maxdepth 4 -type d \
-                \( -name dae -o -name luci-app-dae -o -name luci-app-daed \) \
-                -exec rm -rf {} + 2>/dev/null
-            cp -rf "$DAE_FEED_DIR/dae"          package/
-            cp -rf "$DAE_FEED_DIR/luci-app-dae" package/
-            echo "[dae] 已从 ysuolmai/luci-app-dae 拉取 dae + luci-app-dae"
-        else
-            echo "[dae] 警告：clone luci-app-dae 失败，跳过（构建将失败）"
+        if ! git clone --depth=1 https://github.com/ysuolmai/luci-app-dae "$DAE_FEED_DIR"; then
+            echo "[dae] 错误：clone luci-app-dae 失败"
+            exit 1
         fi
+        # 上游 ImmortalWrt 的 feeds 自带 dae / luci-app-dae / luci-app-daed，
+        # 与我们的同名会撞，buildroot 可能编了上游那份。像 UPDATE_PACKAGE 一样
+        # 把 feeds 和 package 里所有同名包先全删干净，再放我们的。
+        find feeds/ package/ -maxdepth 4 -type d \
+            \( -name dae -o -name luci-app-dae -o -name luci-app-daed \) \
+            -exec rm -rf {} + 2>/dev/null
+        if ! cp -rf "$DAE_FEED_DIR/dae" package/ || \
+           ! cp -rf "$DAE_FEED_DIR/luci-app-dae" package/; then
+            echo "[dae] 错误：安装 luci-app-dae 软件包失败"
+            exit 1
+        fi
+        echo "[dae] 已从 ysuolmai/luci-app-dae 拉取 dae + luci-app-dae"
     else
         rm -rf /tmp/luci-app-dae-feed
         find feeds/ package/ -maxdepth 4 \
             \( -type d -o -type l \) \
             \( -name dae -o -name luci-app-dae -o -name luci-app-daed \) \
             -exec rm -rf {} + 2>/dev/null
-        sed -i -E '/^(CONFIG_PACKAGE_(dae|luci-app-dae|luci-app-daed)=|# CONFIG_PACKAGE_(dae|luci-app-dae|luci-app-daed) is not set)/d' .config
+        for DAE_PACKAGE in dae luci-app-dae luci-app-daed; do
+            set_config "PACKAGE_${DAE_PACKAGE}" remove || exit 1
+        done
         echo "[ebpf] MTK-EBPF 仅启用 Honk，已移除 dae / luci-app-dae / luci-app-daed"
     fi
 
@@ -1087,8 +1165,7 @@ PYEOF
 
     # Honk 新版 LuCI 页面依赖 honk 引擎；legacy 页面保留在仓库中但不打入固件。
     for HONK_PACKAGE in honk luci-app-honk; do
-        sed -i -E "/^(CONFIG_PACKAGE_${HONK_PACKAGE}=|# CONFIG_PACKAGE_${HONK_PACKAGE} is not set)/d" .config
-        echo "CONFIG_PACKAGE_${HONK_PACKAGE}=y" >> .config
+        set_config "PACKAGE_${HONK_PACKAGE}" y || exit 1
     done
     echo "[honk] 已启用 honk + luci-app-honk"
 
